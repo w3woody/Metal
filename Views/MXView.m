@@ -7,11 +7,23 @@
 //
 
 #import "MXView.h"
+#import "MXShaderTypes.h"
+#import "MXGeometry.h"
 
 @interface MXView () <MTKViewDelegate>
 
 // Command queue
 @property (strong) id<MTLCommandQueue> commandQueue;
+
+// Our friend, the triangle.
+@property (strong) id<MTLBuffer> triangle;
+
+// Pipeline state stuff
+@property (strong) id<MTLLibrary> library;
+@property (strong) id<MTLFunction> vertexFunction;
+@property (strong) id<MTLFunction> fragmentFunction;
+@property (strong) id<MTLRenderPipelineState> pipeline;
+
 @end
 
 @implementation MXView
@@ -53,6 +65,30 @@
 	self.delegate = self;
 
 	/*
+	 *	Application startup
+	 */
+
+	[self setupView];
+	[self setupGeometry];
+	[self setupPipeline];
+}
+
+
+/****************************************************************************/
+/*																			*/
+/*	Initialization Methods													*/
+/*																			*/
+/****************************************************************************/
+#pragma mark - Initialization Methods
+
+/*
+ *	Routines which perform basic initialization: getting the device, setting
+ *	screen parameters, and creating the command queue
+ */
+
+- (void)setupView
+{
+	/*
 	 *	Get the device for this view. (For a real MacOS application, this
 	 *	should be replaced with a more sophisticated system that determines
 	 *	the appropriate device depending on which screen this view is located,
@@ -83,6 +119,90 @@
 	self.commandQueue = [self.device newCommandQueue];
 }
 
+/*
+ *	This sets up our geometry: a simple triangle for display.
+ */
+
+- (void)setupGeometry
+{
+    static const MXVertex triangle[] =
+    {
+        // Homogeneous pts , RGBA colors
+        { {  1,  -1, 0, 1 }, { 1, 0, 0, 1 } },
+        { { -1,  -1, 0, 1 }, { 0, 1, 0, 1 } },
+        { {  0,   1, 0, 1 }, { 0, 0, 1, 1 } },
+    };
+
+	self.triangle = [self.device newBufferWithBytes:triangle length:sizeof(triangle) options:MTLResourceOptionCPUCacheModeDefault];
+}
+
+/*
+ *	This sets up our pipeline state. The pipeline state stores information
+ *	such as the vertex and fragment shader functions on the GPU, and the
+ *	attributes used to populate our contents so we can map the contents of
+ *	our buffer (created in setupGeometry above) to the attributes passed to
+ *	our GPU.
+ *
+ *	Note the pipeline state is pretty heavy-weight so we do this once here.
+ */
+
+- (void)setupPipeline
+{
+	/*
+	 *	Step 1: Get our library. This is the library of GPU methods that have
+	 *	been precompiled by Xcode
+	 */
+
+	self.library = [self.device newDefaultLibrary];
+
+	/*
+	 *	Step 2: Get our vertex and fragment functions. These should be the
+	 *	same names as the functions declared in our MXShader file.
+	 */
+
+	self.vertexFunction = [self.library newFunctionWithName:@"vertex_main"];
+	self.fragmentFunction = [self.library newFunctionWithName:@"fragment_main"];
+
+	/*
+	 *	Step 3: Construct our vertex descriptor. We do this to map the
+	 *	offsets in our trangle buffer to the attrite offsets sent to our
+	 *	GPU. Because we're not using the Model I/O API to load a model, we
+	 *	build the MTLVertexDescriptor directly.
+	 *
+	 *	If we were using the Model I/O API to load a model from a resource,
+	 *	we'd create the MDLVertexDescriptor (which are more or less the same
+	 *	thing except not in GPU memory) and use the funnction call
+	 *	MTKMetalVertexDescriptorFromModelIO to convert.
+	 */
+
+	MTLVertexDescriptor *d = [[MTLVertexDescriptor alloc] init];
+	d.attributes[MXAttributeIndexPosition].format = MTLVertexFormatFloat4;
+	d.attributes[MXAttributeIndexPosition].offset = 0;
+	d.attributes[MXAttributeIndexPosition].bufferIndex = 0;
+	d.attributes[MXAttributeIndexColor].format = MTLVertexFormatFloat4;
+	d.attributes[MXAttributeIndexColor].offset = sizeof(vector_float4);
+	d.attributes[MXAttributeIndexColor].bufferIndex = 0;
+	d.layouts[0].stride = sizeof(MXVertex);
+
+	/*
+	 *	Step 4: Start building the pipeline descriptor. This is used to
+	 *	eventually build our pipeline state. Note if we were doing anything
+	 *	more complicated with our pipeline (such as using stencils or depth
+	 *	detection for 3D rendering) we'd set that stuff here.
+	 */
+
+	MTLRenderPipelineDescriptor *pipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	pipelineDescriptor.vertexFunction = self.vertexFunction;
+	pipelineDescriptor.fragmentFunction = self.fragmentFunction;
+	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+	pipelineDescriptor.vertexDescriptor = d;
+
+	/*
+	 *	Build our pipeline state object.
+	 */
+
+	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+}
 
 /****************************************************************************/
 /*																			*/
@@ -115,6 +235,21 @@
 	 */
 
 	id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
+	/*
+	 *	Set up our encoder by indicating the pipeline we will be using for
+	 *	rendering our triangle.
+	 */
+
+	[encoder setRenderPipelineState:self.pipeline];
+
+	/*
+	 *	Now tell our encoder about where our vertex information is located,
+	 *	and ask it to render our triangle.
+	 */
+
+	[encoder setVertexBuffer:self.triangle offset:0 atIndex:MXVertexIndexVertices];
+	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
 
 	/*
 	 *	Commit the encoder, which finishes drawing for this rendering pass
