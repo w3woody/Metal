@@ -1,5 +1,5 @@
 //
-//  ViewController.h
+//  MXViewController.h
 //  Metal
 //
 //  Created by William Woody on 12/27/18.
@@ -8,7 +8,7 @@
 
 #import <Cocoa/Cocoa.h>
 
-@interface ViewController : NSViewController
+@interface MXViewController : NSViewController
 
 
 @end

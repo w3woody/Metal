@@ -1,14 +1,14 @@
 //
-//  ViewController.m
+//  MXViewController.m
 //  Metal
 //
 //  Created by William Woody on 12/27/18.
 //  Copyright © 2018 Glenview Software. All rights reserved.
 //
 
-#import "ViewController.h"
+#import "MXViewController.h"
 
-@implementation ViewController
+@implementation MXViewController
 
 - (void)viewDidLoad {
 	[super viewDidLoad];

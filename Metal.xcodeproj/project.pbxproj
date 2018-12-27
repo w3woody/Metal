@@ -8,23 +8,30 @@
 
 /* Begin PBXBuildFile section */
 		EF4D1E9D21D5536A001D7137 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1E9C21D5536A001D7137 /* AppDelegate.m */; };
-		EF4D1EA021D5536A001D7137 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1E9F21D5536A001D7137 /* ViewController.m */; };
+		EF4D1EA021D5536A001D7137 /* MXViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1E9F21D5536A001D7137 /* MXViewController.m */; };
 		EF4D1EA221D5536A001D7137 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EF4D1EA121D5536A001D7137 /* Assets.xcassets */; };
 		EF4D1EA521D5536A001D7137 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EF4D1EA321D5536A001D7137 /* Main.storyboard */; };
 		EF4D1EA821D5536A001D7137 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EA721D5536A001D7137 /* main.m */; };
+		EF4D1EB221D553ED001D7137 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF4D1EB021D553ED001D7137 /* Metal.framework */; };
+		EF4D1EB321D553ED001D7137 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF4D1EB121D553ED001D7137 /* MetalKit.framework */; };
+		EF4D1EB921D554B5001D7137 /* MXView.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EB821D554B5001D7137 /* MXView.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		EF4D1E9821D5536A001D7137 /* Metal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Metal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF4D1E9B21D5536A001D7137 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		EF4D1E9C21D5536A001D7137 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
-		EF4D1E9E21D5536A001D7137 /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
-		EF4D1E9F21D5536A001D7137 /* ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
+		EF4D1E9E21D5536A001D7137 /* MXViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXViewController.h; sourceTree = "<group>"; };
+		EF4D1E9F21D5536A001D7137 /* MXViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MXViewController.m; sourceTree = "<group>"; };
 		EF4D1EA121D5536A001D7137 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EF4D1EA421D5536A001D7137 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		EF4D1EA621D5536A001D7137 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		EF4D1EA721D5536A001D7137 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		EF4D1EA921D5536A001D7137 /* Metal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Metal.entitlements; sourceTree = "<group>"; };
+		EF4D1EB021D553ED001D7137 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		EF4D1EB121D553ED001D7137 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		EF4D1EB721D554B5001D7137 /* MXView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXView.h; sourceTree = "<group>"; };
+		EF4D1EB821D554B5001D7137 /* MXView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MXView.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +39,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EF4D1EB221D553ED001D7137 /* Metal.framework in Frameworks */,
+				EF4D1EB321D553ED001D7137 /* MetalKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -41,8 +50,12 @@
 		EF4D1E8F21D5536A001D7137 = {
 			isa = PBXGroup;
 			children = (
+				EF4D1EB621D5541C001D7137 /* Render Support */,
+				EF4D1EB521D55410001D7137 /* View Controllers */,
+				EF4D1EB421D55407001D7137 /* Views */,
 				EF4D1E9A21D5536A001D7137 /* Metal */,
 				EF4D1E9921D5536A001D7137 /* Products */,
+				EF4D1EAF21D553EC001D7137 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -59,8 +72,6 @@
 			children = (
 				EF4D1E9B21D5536A001D7137 /* AppDelegate.h */,
 				EF4D1E9C21D5536A001D7137 /* AppDelegate.m */,
-				EF4D1E9E21D5536A001D7137 /* ViewController.h */,
-				EF4D1E9F21D5536A001D7137 /* ViewController.m */,
 				EF4D1EA121D5536A001D7137 /* Assets.xcassets */,
 				EF4D1EA321D5536A001D7137 /* Main.storyboard */,
 				EF4D1EA621D5536A001D7137 /* Info.plist */,
@@ -68,6 +79,40 @@
 				EF4D1EA921D5536A001D7137 /* Metal.entitlements */,
 			);
 			path = Metal;
+			sourceTree = "<group>";
+		};
+		EF4D1EAF21D553EC001D7137 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				EF4D1EB021D553ED001D7137 /* Metal.framework */,
+				EF4D1EB121D553ED001D7137 /* MetalKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		EF4D1EB421D55407001D7137 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				EF4D1EB721D554B5001D7137 /* MXView.h */,
+				EF4D1EB821D554B5001D7137 /* MXView.m */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		EF4D1EB521D55410001D7137 /* View Controllers */ = {
+			isa = PBXGroup;
+			children = (
+				EF4D1E9E21D5536A001D7137 /* MXViewController.h */,
+				EF4D1E9F21D5536A001D7137 /* MXViewController.m */,
+			);
+			path = "View Controllers";
+			sourceTree = "<group>";
+		};
+		EF4D1EB621D5541C001D7137 /* Render Support */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "Render Support";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -96,6 +141,7 @@
 		EF4D1E9021D5536A001D7137 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				CLASSPREFIX = MX;
 				LastUpgradeCheck = 1010;
 				ORGANIZATIONNAME = "Glenview Software";
 				TargetAttributes = {
@@ -139,9 +185,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				EF4D1EA021D5536A001D7137 /* ViewController.m in Sources */,
+				EF4D1EA021D5536A001D7137 /* MXViewController.m in Sources */,
 				EF4D1EA821D5536A001D7137 /* main.m in Sources */,
 				EF4D1E9D21D5536A001D7137 /* AppDelegate.m in Sources */,
+				EF4D1EB921D554B5001D7137 /* MXView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
