@@ -16,6 +16,7 @@
 		EF4D1EB321D553ED001D7137 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF4D1EB121D553ED001D7137 /* MetalKit.framework */; };
 		EF4D1EB921D554B5001D7137 /* MXView.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EB821D554B5001D7137 /* MXView.m */; };
 		EF4D1EBD21D57FBA001D7137 /* MXShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EBC21D57FBA001D7137 /* MXShader.metal */; };
+		EF4D1EC121D69A4A001D7137 /* MXTransformationStack.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EC021D69A4A001D7137 /* MXTransformationStack.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,8 @@
 		EF4D1EBA21D57286001D7137 /* MXShaderTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXShaderTypes.h; sourceTree = "<group>"; };
 		EF4D1EBB21D57CC9001D7137 /* MXGeometry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXGeometry.h; sourceTree = "<group>"; };
 		EF4D1EBC21D57FBA001D7137 /* MXShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXShader.metal; sourceTree = "<group>"; };
+		EF4D1EBF21D69A4A001D7137 /* MXTransformationStack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MXTransformationStack.h; sourceTree = "<group>"; };
+		EF4D1EC021D69A4A001D7137 /* MXTransformationStack.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MXTransformationStack.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,6 +57,7 @@
 		EF4D1E8F21D5536A001D7137 = {
 			isa = PBXGroup;
 			children = (
+				EF4D1EBE21D69A38001D7137 /* 3D Transformations */,
 				EF4D1EB621D5541C001D7137 /* Render Support */,
 				EF4D1EB521D55410001D7137 /* View Controllers */,
 				EF4D1EB421D55407001D7137 /* Views */,
@@ -120,6 +124,15 @@
 				EF4D1EBC21D57FBA001D7137 /* MXShader.metal */,
 			);
 			path = "Render Support";
+			sourceTree = "<group>";
+		};
+		EF4D1EBE21D69A38001D7137 /* 3D Transformations */ = {
+			isa = PBXGroup;
+			children = (
+				EF4D1EBF21D69A4A001D7137 /* MXTransformationStack.h */,
+				EF4D1EC021D69A4A001D7137 /* MXTransformationStack.m */,
+			);
+			path = "3D Transformations";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -195,6 +208,7 @@
 				EF4D1EBD21D57FBA001D7137 /* MXShader.metal in Sources */,
 				EF4D1EA021D5536A001D7137 /* MXViewController.m in Sources */,
 				EF4D1EA821D5536A001D7137 /* main.m in Sources */,
+				EF4D1EC121D69A4A001D7137 /* MXTransformationStack.m in Sources */,
 				EF4D1E9D21D5536A001D7137 /* AppDelegate.m in Sources */,
 				EF4D1EB921D554B5001D7137 /* MXView.m in Sources */,
 			);
