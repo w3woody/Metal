@@ -20,6 +20,7 @@
 typedef enum MXVertexIndex
 {
 	MXVertexIndexVertices = 0,		/* For [[stage_in]], the vertex buffer MUST BE 0 */
+	MXVertexIndexUniforms = 1,		/* Location of uniforms */
 } MXVertexIndex;
 
 /*
@@ -31,5 +32,15 @@ typedef enum MXAttributeIndex
 	MXAttributeIndexPosition = 0,
 	MXAttributeIndexColor = 1
 } MXAttributeIndex;
+
+/*
+ *	Uniforms structure
+ */
+
+typedef struct MXUniforms
+{
+	matrix_float4x4 model;
+	matrix_float4x4 view;
+} MXUniforms;
 
 #endif /* MXShaderTypes_h */

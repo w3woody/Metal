@@ -9,6 +9,7 @@
 #import "MXView.h"
 #import "MXShaderTypes.h"
 #import "MXGeometry.h"
+#import "MXTransformationStack.h"
 
 @interface MXView () <MTKViewDelegate>
 
@@ -23,6 +24,13 @@
 @property (strong) id<MTLFunction> vertexFunction;
 @property (strong) id<MTLFunction> fragmentFunction;
 @property (strong) id<MTLRenderPipelineState> pipeline;
+
+// Transformation matrices
+@property (strong) MXTransformationStack *view;
+@property (strong) MXTransformationStack *model;
+
+// Starting time
+@property (assign) double startTime;
 
 @end
 
@@ -65,12 +73,19 @@
 	self.delegate = self;
 
 	/*
+	 *	Note the start time
+	 */
+
+	self.startTime = CACurrentMediaTime();
+
+	/*
 	 *	Application startup
 	 */
 
 	[self setupView];
 	[self setupGeometry];
 	[self setupPipeline];
+	[self setupTransformation];
 }
 
 
@@ -109,8 +124,8 @@
 	// The following two calls essentially change the behavior of our view
 	// so that it only updates on setNeedsDisplay. This behavior is useful
 	// if you are creating a 3D CAD system instead of a game.
-	self.paused = YES;
-	self.enableSetNeedsDisplay = YES;
+//	self.paused = YES;
+//	self.enableSetNeedsDisplay = YES;
 
 	/*
 	 *	Get the command queue for this device.
@@ -204,6 +219,16 @@
 	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
 }
 
+/*
+ *	Setup transformation
+ */
+
+- (void)setupTransformation
+{
+	self.view = [[MXTransformationStack alloc] init];
+	self.model = [[MXTransformationStack alloc] init];
+}
+
 /****************************************************************************/
 /*																			*/
 /*	MTKViewDelegate Methods													*/
@@ -213,6 +238,8 @@
 
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size
 {
+	[self.view clear];
+	[self.view perspective:M_PI/3 aspect:size.width/size.height near:0.1 far:1000];
 }
 
 - (void)drawInMTKView:(MTKView *)view
@@ -242,6 +269,20 @@
 	 */
 
 	[encoder setRenderPipelineState:self.pipeline];
+
+	/*
+	 *	Update the model transformation
+	 */
+
+	double elapsed = CACurrentMediaTime() - self.startTime;
+	[self.model clear];
+	[self.model translateByX:0 y:0 z:-2];
+	[self.model rotateAroundAxis:(vector_float3){ 0, 1, 0 } byAngle:elapsed];
+
+	MXUniforms u;
+	u.view = self.view.ctm;
+	u.model = self.model.ctm;
+	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 
 	/*
 	 *	Now tell our encoder about where our vertex information is located,

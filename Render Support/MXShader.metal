@@ -57,11 +57,13 @@ struct VertexOut
  *		Note that by default the range of our geometry is [-1,1] in X and Y.
  */
 
-vertex VertexOut vertex_main(VertexIn v [[stage_in]])
+vertex VertexOut vertex_main(VertexIn v [[stage_in]],
+							 constant MXUniforms &u [[buffer(MXVertexIndexUniforms)]])
 {
 	VertexOut out;
 
-	out.position = v.position;
+	float4 worldPosition = u.model * v.position;
+	out.position = u.view * worldPosition;
 	out.color = v.color;
 
 	return out;
