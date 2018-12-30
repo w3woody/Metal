@@ -30,7 +30,8 @@ typedef enum MXVertexIndex
 typedef enum MXAttributeIndex
 {
 	MXAttributeIndexPosition = 0,
-	MXAttributeIndexColor = 1
+	MXAttributeIndexNormal = 1,
+	MXAttributeIndexTexture = 2,
 } MXAttributeIndex;
 
 /*

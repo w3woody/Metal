@@ -24,8 +24,9 @@ using namespace metal;
  */
 
 struct VertexIn {
-    float4 position  [[attribute(MXAttributeIndexPosition)]];
-    float4 color     [[attribute(MXAttributeIndexColor)]];
+    float3 position  [[attribute(MXAttributeIndexPosition)]];
+    float3 normal    [[attribute(MXAttributeIndexNormal)]];
+    float2 texture   [[attribute(MXAttributeIndexTexture)]];
 };
 
 struct VertexOut
@@ -62,9 +63,9 @@ vertex VertexOut vertex_main(VertexIn v [[stage_in]],
 {
 	VertexOut out;
 
-	float4 worldPosition = u.model * v.position;
+	float4 worldPosition = u.model * float4(v.position,1.0);
 	out.position = u.view * worldPosition;
-	out.color = v.color;
+	out.color = float4(v.normal,1.0);
 
 	return out;
 }

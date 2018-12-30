@@ -43,8 +43,9 @@
 
 typedef struct MXVertex
 {
-	vector_float4 position;
-	vector_float4 color;
+	vector_float3 position;
+	vector_float3 normal;
+	vector_float2 texture;
 } MXVertex;
 
 #endif /* MXGeometry_h */

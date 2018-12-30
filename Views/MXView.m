@@ -16,14 +16,17 @@
 // Command queue
 @property (strong) id<MTLCommandQueue> commandQueue;
 
-// Our friend, the triangle.
-@property (strong) id<MTLBuffer> triangle;
+// The teapot, as a collection of meshes
+@property (strong) NSArray<MTKMesh *> *teapot;
 
 // Pipeline state stuff
 @property (strong) id<MTLLibrary> library;
 @property (strong) id<MTLFunction> vertexFunction;
 @property (strong) id<MTLFunction> fragmentFunction;
 @property (strong) id<MTLRenderPipelineState> pipeline;
+
+// Depth stencil
+@property (strong) id<MTLDepthStencilState> depth;
 
 // Transformation matrices
 @property (strong) MXTransformationStack *view;
@@ -83,9 +86,9 @@
 	 */
 
 	[self setupView];
-	[self setupGeometry];
 	[self setupPipeline];
 	[self setupTransformation];
+	[self setupDepthStencilState];
 }
 
 
@@ -120,6 +123,7 @@
 
 	self.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
 	self.clearColor = MTLClearColorMake(0.1, 0.1, 0.2, 1.0);
+	self.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
 
 	// The following two calls essentially change the behavior of our view
 	// so that it only updates on setNeedsDisplay. This behavior is useful
@@ -134,21 +138,17 @@
 	self.commandQueue = [self.device newCommandQueue];
 }
 
-/*
- *	This sets up our geometry: a simple triangle for display.
- */
-
-- (void)setupGeometry
+- (void)setupDepthStencilState
 {
-    static const MXVertex triangle[] =
-    {
-        // Homogeneous pts , RGBA colors
-        { {  1,  -1, 0, 1 }, { 1, 0, 0, 1 } },
-        { { -1,  -1, 0, 1 }, { 0, 1, 0, 1 } },
-        { {  0,   1, 0, 1 }, { 0, 0, 1, 1 } },
-    };
+	/*
+	 *	Set up the depth stencil
+	 */
 
-	self.triangle = [self.device newBufferWithBytes:triangle length:sizeof(triangle) options:MTLResourceOptionCPUCacheModeDefault];
+	MTLDepthStencilDescriptor *depthDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+	depthDescriptor.depthCompareFunction = MTLCompareFunctionLess;
+	[depthDescriptor setDepthWriteEnabled:YES];
+
+	self.depth = [self.device newDepthStencilStateWithDescriptor:depthDescriptor];
 }
 
 /*
@@ -190,14 +190,12 @@
 	 *	MTKMetalVertexDescriptorFromModelIO to convert.
 	 */
 
-	MTLVertexDescriptor *d = [[MTLVertexDescriptor alloc] init];
-	d.attributes[MXAttributeIndexPosition].format = MTLVertexFormatFloat4;
-	d.attributes[MXAttributeIndexPosition].offset = 0;
-	d.attributes[MXAttributeIndexPosition].bufferIndex = 0;
-	d.attributes[MXAttributeIndexColor].format = MTLVertexFormatFloat4;
-	d.attributes[MXAttributeIndexColor].offset = sizeof(vector_float4);
-	d.attributes[MXAttributeIndexColor].bufferIndex = 0;
-	d.layouts[0].stride = sizeof(MXVertex);
+	MDLVertexDescriptor *d = [[MDLVertexDescriptor alloc] init];
+	d.attributes[0] = [[MDLVertexAttribute alloc] initWithName:MDLVertexAttributePosition format:MDLVertexFormatFloat3 offset:0 bufferIndex:0];
+	d.attributes[1] = [[MDLVertexAttribute alloc] initWithName:MDLVertexAttributeNormal format:MDLVertexFormatFloat3 offset:sizeof(vector_float3) bufferIndex:0];
+	d.attributes[2] = [[MDLVertexAttribute alloc] initWithName:MDLVertexAttributeTextureCoordinate format:MDLVertexFormatFloat2 offset:sizeof(vector_float3) * 2 bufferIndex:0];
+	d.layouts[0] = [[MDLVertexBufferLayout alloc] initWithStride:sizeof(MXVertex)];
+
 
 	/*
 	 *	Step 4: Start building the pipeline descriptor. This is used to
@@ -210,13 +208,24 @@
 	pipelineDescriptor.vertexFunction = self.vertexFunction;
 	pipelineDescriptor.fragmentFunction = self.fragmentFunction;
 	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
-	pipelineDescriptor.vertexDescriptor = d;
+	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
+	pipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
 
 	/*
 	 *	Build our pipeline state object.
 	 */
 
 	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+
+	/*
+	 *	Use the vertex descriptor to load our model.
+	 */
+
+	NSURL *modelURL = [[NSBundle mainBundle] URLForResource:@"teapot" withExtension:@"obj"];
+	MTKMeshBufferAllocator *allocator = [[MTKMeshBufferAllocator alloc] initWithDevice:self.device];
+	MDLAsset *asset = [[MDLAsset alloc] initWithURL:modelURL vertexDescriptor:d bufferAllocator:allocator];
+	self.teapot = [MTKMesh newMeshesFromAsset:asset device:self.device sourceMeshes:nil error:nil];
+
 }
 
 /*
@@ -278,6 +287,7 @@
 	[self.model clear];
 	[self.model translateByX:0 y:0 z:-2];
 	[self.model rotateAroundAxis:(vector_float3){ 0, 1, 0 } byAngle:elapsed];
+	[self.model scaleBy:2];
 
 	MXUniforms u;
 	u.view = self.view.ctm;
@@ -285,12 +295,31 @@
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 
 	/*
+	 *	Enable back-face culling
+	 */
+
+	[encoder setCullMode:MTLCullModeBack];
+
+	/*
+	 *	Set the depth stencil
+	 */
+
+	[encoder setDepthStencilState:self.depth];
+
+	/*
 	 *	Now tell our encoder about where our vertex information is located,
 	 *	and ask it to render our triangle.
 	 */
 
-	[encoder setVertexBuffer:self.triangle offset:0 atIndex:MXVertexIndexVertices];
-	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+	for (MTKMesh *mesh in self.teapot) {
+		MTKMeshBuffer *vertexBuffer = [[mesh vertexBuffers] firstObject];
+		[encoder setVertexBuffer:vertexBuffer.buffer offset:vertexBuffer.offset atIndex:0];
+
+		for (MTKSubmesh *submesh in mesh.submeshes) {
+			MTKMeshBuffer *indexBuffer = submesh.indexBuffer;
+			[encoder drawIndexedPrimitives:submesh.primitiveType indexCount:submesh.indexCount indexType:submesh.indexType indexBuffer:indexBuffer.buffer indexBufferOffset:indexBuffer.offset];
+		}
+	}
 
 	/*
 	 *	Commit the encoder, which finishes drawing for this rendering pass
