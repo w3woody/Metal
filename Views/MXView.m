@@ -298,7 +298,7 @@
 	 *	Enable back-face culling
 	 */
 
-	[encoder setCullMode:MTLCullModeBack];
+	[encoder setCullMode:MTLCullModeFront];
 
 	/*
 	 *	Set the depth stencil
