@@ -286,21 +286,19 @@
 	double elapsed = CACurrentMediaTime() - self.startTime;
 	[self.model clear];
 	[self.model translateByX:0 y:0 z:-2];
-	[self.model rotateAroundFixedAxis:MTXXAxis byAngle:0.4];
 	[self.model rotateAroundAxis:(vector_float3){ 0, 1, 0 } byAngle:elapsed];
 	[self.model scaleBy:2];
 
 	MXUniforms u;
 	u.view = self.view.ctm;
 	u.model = self.model.ctm;
-	u.inverse = self.model.inverseCtm;
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 
 	/*
 	 *	Enable back-face culling
 	 */
 
-	[encoder setCullMode:MTLCullModeFront];
+	[encoder setCullMode:MTLCullModeBack];
 
 	/*
 	 *	Set the depth stencil

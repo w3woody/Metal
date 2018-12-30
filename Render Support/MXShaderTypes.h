@@ -42,7 +42,6 @@ typedef struct MXUniforms
 {
 	matrix_float4x4 model;
 	matrix_float4x4 view;
-	matrix_float4x4 inverse;	// inverse of model
 } MXUniforms;
 
 #endif /* MXShaderTypes_h */
