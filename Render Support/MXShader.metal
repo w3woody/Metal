@@ -32,7 +32,8 @@ struct VertexIn {
 struct VertexOut
 {
 	float4 position [[position]];
-	float4 color;
+	float3 normal;
+	float2 texture;
 };
 
 /****************************************************************************/
@@ -65,7 +66,9 @@ vertex VertexOut vertex_main(VertexIn v [[stage_in]],
 
 	float4 worldPosition = u.model * float4(v.position,1.0);
 	out.position = u.view * worldPosition;
-	out.color = float4(v.normal,1.0);
+	float4 nvect = float4(v.normal,0) * u.inverse;
+	out.normal = nvect.xyz;
+	out.texture = v.texture;
 
 	return out;
 }
@@ -84,7 +87,18 @@ vertex VertexOut vertex_main(VertexIn v [[stage_in]],
  *		Here, of course, we're boring and we just output the interpolated color.
  */
 
+constant float3 teapotColor(1.0,0.5,0.75);
+
+constant float3 lightColor(1,1,1);
+constant float ambientIntensity = 0.1;
+constant float3 lightDirection(1,0,1);
+
 fragment float4 fragment_main(VertexOut v [[stage_in]])
 {
-	return v.color;
+	float4 ambient = float4(teapotColor * lightColor * ambientIntensity,1.0);
+	float diffuseIntensity = dot(v.normal,lightDirection);
+	diffuseIntensity = clamp(diffuseIntensity,0.01,0.89);
+	float4 diffuse = float4(teapotColor * lightColor * diffuseIntensity,1.0);
+
+	return ambient + diffuse;
 }
