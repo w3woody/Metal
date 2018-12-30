@@ -89,6 +89,11 @@
 	[self setupPipeline];
 	[self setupTransformation];
 	[self setupDepthStencilState];
+
+	// Kludge to make sure our size is drawin in the proper order
+	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+		[self mtkView:self drawableSizeWillChange:self.bounds.size];
+	});
 }
 
 
