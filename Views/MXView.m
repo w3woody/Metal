@@ -28,6 +28,9 @@
 // Depth stencil
 @property (strong) id<MTLDepthStencilState> depth;
 
+// Textures and support
+@property (strong) id<MTLTexture> texture;
+
 // Transformation matrices
 @property (strong) MXTransformationStack *view;
 @property (strong) MXTransformationStack *model;
@@ -89,6 +92,7 @@
 	[self setupPipeline];
 	[self setupTransformation];
 	[self setupDepthStencilState];
+	[self setupTextures];
 
 	// Kludge to make sure our size is drawin in the proper order
 	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -96,6 +100,27 @@
 	});
 }
 
+/****************************************************************************/
+/*																			*/
+/*	Texture Loading															*/
+/*																			*/
+/****************************************************************************/
+#pragma mark - Texture Loading
+
+- (void)setupTextures
+{
+	/*
+	 *	Texture loader
+	 */
+
+	MTKTextureLoader *textureLoader = [[MTKTextureLoader alloc] initWithDevice:self.device];
+
+	/*
+	 *	Our textures
+	 */
+
+	self.texture = [textureLoader newTextureWithName:@"texture" scaleFactor:1.0 bundle:nil options:@{} error:nil];
+}
 
 /****************************************************************************/
 /*																			*/
@@ -312,6 +337,12 @@
 	 */
 
 	[encoder setDepthStencilState:self.depth];
+
+	/*
+	 *	Set textures
+	 */
+
+	[encoder setFragmentTexture:self.texture atIndex:MXTextureIndex0];
 
 	/*
 	 *	Now tell our encoder about where our vertex information is located,

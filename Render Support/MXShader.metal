@@ -87,7 +87,7 @@ vertex VertexOut vertex_main(VertexIn v [[stage_in]],
  *		Here, of course, we're boring and we just output the interpolated color.
  */
 
-constant float3 teapotColor(1.0,0.5,0.75);
+//constant float3 teapotColor(1.0,0.5,0.75);
 
 constant float3 lightColor(1,1,1);
 constant float ambientIntensity = 0.1;
@@ -96,10 +96,18 @@ constant float3 eyeDirection(0,0,1);
 constant float specularTightness = 25;
 constant float specularIntensity = 0.75;
 
-fragment float4 fragment_main(VertexOut v [[stage_in]])
+fragment float4 fragment_main(VertexOut v [[stage_in]],
+							  texture2d<float, access::sample> texture [[texture(MXTextureIndex0)]])
 {
+    constexpr sampler linearSampler (mip_filter::linear,
+                                     mag_filter::linear,
+                                     min_filter::linear);
+
 	const float3 normalLight = normalize(lightDirection);
 	const float3 normalEye = normalize(eyeDirection);
+
+	// Texture color
+	float3 teapotColor = texture.sample(linearSampler,v.texture).rgb;
 
 	// Ambient lighting
 	float4 ambient = float4(teapotColor * lightColor * ambientIntensity,1.0);

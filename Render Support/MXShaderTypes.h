@@ -35,6 +35,15 @@ typedef enum MXAttributeIndex
 } MXAttributeIndex;
 
 /*
+ *	Attribute indexes. This is the same idea as above, but for attributes.
+ */
+
+typedef enum MXTextureIndex
+{
+	MXTextureIndex0 = 0,
+} MXTextureIndex;
+
+/*
  *	Uniforms structure
  */
 
