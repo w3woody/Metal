@@ -73,6 +73,16 @@ vertex VertexOut vertex_main(VertexIn v [[stage_in]],
 	return out;
 }
 
+/*	fragment_mirror
+ *
+ *		Mirror fragment; this simply returns our mirror surface color
+ */
+
+fragment float4 fragment_mirror(VertexOut v [[stage_in]])
+{
+	return float4(1,1,1,0.2);
+}
+
 /*	fragment_main
  *
  *		The main fragment shader function used by our GPU. In general this would

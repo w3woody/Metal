@@ -19,14 +19,24 @@
 // The teapot, as a collection of meshes
 @property (strong) NSArray<MTKMesh *> *teapot;
 
+// Our mirror
+@property (strong) id<MTLBuffer> mirror;
+
 // Pipeline state stuff
 @property (strong) id<MTLLibrary> library;
 @property (strong) id<MTLFunction> vertexFunction;
 @property (strong) id<MTLFunction> fragmentFunction;
 @property (strong) id<MTLRenderPipelineState> pipeline;
 
+@property (strong) id<MTLFunction> fragmentFunction2;
+@property (strong) id<MTLRenderPipelineState> pipeline2;
+
+@property (strong) id<MTLRenderPipelineState> pipelineNoDraw;
+
 // Depth stencil
 @property (strong) id<MTLDepthStencilState> depth;
+@property (strong) id<MTLDepthStencilState> drawStencil;
+@property (strong) id<MTLDepthStencilState> maskStencil;
 
 // Textures and support
 @property (strong) id<MTLTexture> texture;
@@ -153,7 +163,8 @@
 
 	self.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
 	self.clearColor = MTLClearColorMake(0.1, 0.1, 0.2, 1.0);
-	self.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
+	self.depthStencilPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+	self.clearStencil = 0;
 
 	// The following two calls essentially change the behavior of our view
 	// so that it only updates on setNeedsDisplay. This behavior is useful
@@ -179,6 +190,38 @@
 	[depthDescriptor setDepthWriteEnabled:YES];
 
 	self.depth = [self.device newDepthStencilStateWithDescriptor:depthDescriptor];
+
+	/*
+	 *	Set up a depth stencil with additional function to set our stencil. This
+	 *	will set the stencil buffer to the value stored in our encoder if
+	 *	a pixel is drawn.
+	 */
+	depthDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+	depthDescriptor.depthCompareFunction = MTLCompareFunctionLess;
+
+	MTLStencilDescriptor *stencilDescriptor = [[MTLStencilDescriptor alloc] init];
+	stencilDescriptor.stencilCompareFunction = MTLCompareFunctionAlways;
+	stencilDescriptor.depthStencilPassOperation = MTLStencilOperationReplace;
+	depthDescriptor.backFaceStencil = stencilDescriptor;
+	depthDescriptor.frontFaceStencil = stencilDescriptor;
+	depthDescriptor.depthWriteEnabled = NO;
+
+	self.drawStencil = [self.device newDepthStencilStateWithDescriptor:depthDescriptor];
+
+	/*
+	 *	Set up a depth stencil with additional function to draw only where our
+	 *	stencil is set.
+	 */
+	depthDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+	depthDescriptor.depthCompareFunction = MTLCompareFunctionLess;
+
+	stencilDescriptor = [[MTLStencilDescriptor alloc] init];
+	stencilDescriptor.stencilCompareFunction = MTLCompareFunctionEqual;
+	depthDescriptor.backFaceStencil = stencilDescriptor;
+	depthDescriptor.frontFaceStencil = stencilDescriptor;
+	depthDescriptor.depthWriteEnabled = YES;
+
+	self.maskStencil = [self.device newDepthStencilStateWithDescriptor:depthDescriptor];
 }
 
 /*
@@ -207,6 +250,7 @@
 
 	self.vertexFunction = [self.library newFunctionWithName:@"vertex_main"];
 	self.fragmentFunction = [self.library newFunctionWithName:@"fragment_main"];
+	self.fragmentFunction2 = [self.library newFunctionWithName:@"fragment_mirror"];
 
 	/*
 	 *	Step 3: Construct our vertex descriptor. We do this to map the
@@ -240,12 +284,53 @@
 	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
 	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
 	pipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
+	pipelineDescriptor.stencilAttachmentPixelFormat = self.depthStencilPixelFormat;
 
 	/*
 	 *	Build our pipeline state object.
 	 */
 
 	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+
+	/*
+	 *	Build our second pipeline. We use all the same stuff for our vertex
+	 *	transformations, bout our fragment is different. Note we also need to
+	 *	enable alpha blending for our mirror.
+	 */
+
+	MTLRenderPipelineDescriptor *pipelineDescriptor2 = [MTLRenderPipelineDescriptor new];
+	pipelineDescriptor2.vertexFunction = self.vertexFunction;
+	pipelineDescriptor2.fragmentFunction = self.fragmentFunction2;
+	pipelineDescriptor2.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
+	pipelineDescriptor2.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
+	pipelineDescriptor2.stencilAttachmentPixelFormat = self.depthStencilPixelFormat;
+
+	pipelineDescriptor2.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+	pipelineDescriptor2.colorAttachments[0].blendingEnabled = YES;
+	pipelineDescriptor2.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+	pipelineDescriptor2.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+	pipelineDescriptor2.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+	pipelineDescriptor2.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+	pipelineDescriptor2.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+	pipelineDescriptor2.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+
+	self.pipeline2 = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor2 error:nil];
+
+	/*
+	 *	Pipeline disabling drawing
+	 */
+
+	MTLRenderPipelineDescriptor *pipelineDescriptor3 = [MTLRenderPipelineDescriptor new];
+	pipelineDescriptor3.vertexFunction = self.vertexFunction;
+	pipelineDescriptor3.fragmentFunction = self.fragmentFunction2;
+	pipelineDescriptor3.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
+	pipelineDescriptor3.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
+	pipelineDescriptor3.stencilAttachmentPixelFormat = self.depthStencilPixelFormat;
+
+	pipelineDescriptor3.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+	pipelineDescriptor3.colorAttachments[0].writeMask = MTLColorWriteMaskNone;
+
+	self.pipelineNoDraw = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor3 error:nil];
 
 	/*
 	 *	Use the vertex descriptor to load our model.
@@ -256,6 +341,19 @@
 	MDLAsset *asset = [[MDLAsset alloc] initWithURL:modelURL vertexDescriptor:d bufferAllocator:allocator];
 	self.teapot = [MTKMesh newMeshesFromAsset:asset device:self.device sourceMeshes:nil error:nil];
 
+	/*
+	 *	Create a simple square out of two triangles
+	 */
+
+	static const MXVertex square[] = {
+		{ { -0.5, 0, -0.5 }, { 0, 0, 1 }, { -1, -1 } },
+		{ { -0.5, 0,  0.5 }, { 0, 0, 1 }, { -1,  1 } },
+		{ {  0.5, 0, -0.5 }, { 0, 0, 1 }, {  1, -1 } },
+		{ { -0.5, 0,  0.5 }, { 0, 0, 1 }, { -1,  1 } },
+		{ {  0.5, 0, -0.5 }, { 0, 0, 1 }, {  1, -1 } },
+		{ {  0.5, 0,  0.5 }, { 0, 0, 1 }, {  1,  1 } },
+	};
+	self.mirror = [self.device newBufferWithBytes:square length:sizeof(square) options:MTLResourceOptionCPUCacheModeDefault];
 }
 
 /*
@@ -267,6 +365,27 @@
 	self.view = [[MXTransformationStack alloc] init];
 	self.model = [[MXTransformationStack alloc] init];
 }
+
+/****************************************************************************/
+/*																			*/
+/*	Rendering Support														*/
+/*																			*/
+/****************************************************************************/
+#pragma mark - Rendering Support
+
+- (void)renderMesh:(NSArray<MTKMesh *> *)meshArray inEncoder:(id<MTLRenderCommandEncoder>)encoder
+{
+	for (MTKMesh *mesh in meshArray) {
+		MTKMeshBuffer *vertexBuffer = [[mesh vertexBuffers] firstObject];
+		[encoder setVertexBuffer:vertexBuffer.buffer offset:vertexBuffer.offset atIndex:0];
+
+		for (MTKSubmesh *submesh in mesh.submeshes) {
+			MTKMeshBuffer *indexBuffer = submesh.indexBuffer;
+			[encoder drawIndexedPrimitives:submesh.primitiveType indexCount:submesh.indexCount indexType:submesh.indexType indexBuffer:indexBuffer.buffer indexBufferOffset:indexBuffer.offset];
+		}
+	}
+}
+
 
 /****************************************************************************/
 /*																			*/
@@ -303,61 +422,91 @@
 	id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
 
 	/*
-	 *	Set up our encoder by indicating the pipeline we will be using for
-	 *	rendering our triangle.
-	 */
-
-	[encoder setRenderPipelineState:self.pipeline];
-
-	/*
 	 *	Update the model transformation
 	 */
 
 	double elapsed = CACurrentMediaTime() - self.startTime;
 	[self.model clear];
 	[self.model translateByX:0 y:0 z:-2];
-	[self.model rotateAroundFixedAxis:MTXXAxis byAngle:0.4];
 	[self.model rotateAroundAxis:(vector_float3){ 0, 1, 0 } byAngle:elapsed];
 	[self.model scaleBy:2];
 
 	MXUniforms u;
-	u.view = self.view.ctm;
 	u.model = self.model.ctm;
 	u.inverse = self.model.inverseCtm;
+
+	/*
+	 *	Render our mirror into our stencil buffer. Note we use a pipeline which
+	 *	prevents drawing in our depth or color map, just into the stencil.
+	 */
+
+	[self.view push];
+	[self.view translateByX:0 y:-0.55 z:0];
+
+	u.view = self.view.ctm;
+	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
+	[encoder setStencilReferenceValue:1];
+	[encoder setRenderPipelineState:self.pipelineNoDraw];
+	[encoder setDepthStencilState:self.drawStencil];
+	[encoder setCullMode:MTLCullModeNone];
+	[encoder setVertexBuffer:self.mirror offset:0 atIndex:MXVertexIndexVertices];
+	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+
+	[self.view pop];
+
+	/*
+	 *	Render our upright teapot.
+	 */
+
+	u.view = self.view.ctm;
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 
-	/*
-	 *	Enable back-face culling
-	 */
-
+	[encoder setRenderPipelineState:self.pipeline];
 	[encoder setCullMode:MTLCullModeFront];
-
-	/*
-	 *	Set the depth stencil
-	 */
-
 	[encoder setDepthStencilState:self.depth];
-
-	/*
-	 *	Set textures
-	 */
-
 	[encoder setFragmentTexture:self.texture atIndex:MXTextureIndex0];
 
+	[self renderMesh:self.teapot inEncoder:encoder];
+
 	/*
-	 *	Now tell our encoder about where our vertex information is located,
-	 *	and ask it to render our triangle.
+	 *	Render the reflection. Also demonstrates the push/pop functionality
+	 *	of our view matrix
 	 */
 
-	for (MTKMesh *mesh in self.teapot) {
-		MTKMeshBuffer *vertexBuffer = [[mesh vertexBuffers] firstObject];
-		[encoder setVertexBuffer:vertexBuffer.buffer offset:vertexBuffer.offset atIndex:0];
+	[self.view push];
+	[self.view translateByX:0 y:-1.1 z:0];
+	[self.view scaleByX:1 y:-1 z:1];
 
-		for (MTKSubmesh *submesh in mesh.submeshes) {
-			MTKMeshBuffer *indexBuffer = submesh.indexBuffer;
-			[encoder drawIndexedPrimitives:submesh.primitiveType indexCount:submesh.indexCount indexType:submesh.indexType indexBuffer:indexBuffer.buffer indexBufferOffset:indexBuffer.offset];
-		}
-	}
+	u.view = self.view.ctm;
+	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
+
+	// scale by -1 flips the winding order, so flip the culling mode.
+	[encoder setRenderPipelineState:self.pipeline];
+	[encoder setCullMode:MTLCullModeBack];
+	[encoder setDepthStencilState:self.maskStencil];
+	[encoder setFragmentTexture:self.texture atIndex:MXTextureIndex0];
+
+	[self renderMesh:self.teapot inEncoder:encoder];
+	[self.view pop];
+
+	/*
+	 *	Render the mirror. This must be done after the mirror reflection of
+	 *	our teapot so we properly deal with the alpha blending
+	 */
+
+	[self.view push];
+	[self.view translateByX:0 y:-0.55 z:0];
+
+	u.view = self.view.ctm;
+	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
+
+	[encoder setRenderPipelineState:self.pipeline2];
+	[encoder setCullMode:MTLCullModeNone];
+	[encoder setDepthStencilState:self.depth];
+	[encoder setVertexBuffer:self.mirror offset:0 atIndex:MXVertexIndexVertices];
+	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+
+	[self.view pop];
 
 	/*
 	 *	Commit the encoder, which finishes drawing for this rendering pass
