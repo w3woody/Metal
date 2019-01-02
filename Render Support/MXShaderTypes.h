@@ -41,6 +41,7 @@ typedef enum MXAttributeIndex
 typedef enum MXTextureIndex
 {
 	MXTextureIndex0 = 0,
+	MXTextureIndexShadow = 1,
 } MXTextureIndex;
 
 /*
@@ -52,6 +53,7 @@ typedef struct MXUniforms
 	matrix_float4x4 model;
 	matrix_float4x4 view;
 	matrix_float4x4 inverse;	// inverse of model
+	matrix_float4x4 shadow;		// matrix for light position/shadow mapping
 } MXUniforms;
 
 #endif /* MXShaderTypes_h */

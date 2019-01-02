@@ -32,6 +32,7 @@ struct VertexIn {
 struct VertexOut
 {
 	float4 position [[position]];
+	float4 shadow;
 	float3 normal;
 	float2 texture;
 };
@@ -67,6 +68,9 @@ vertex VertexOut vertex_main(VertexIn v [[stage_in]],
 	float4 worldPosition = u.model * float4(v.position,1.0);
 	out.position = u.view * worldPosition;
 	float4 nvect = float4(v.normal,0) * u.inverse;
+	
+	out.shadow = u.shadow * float4(v.position,1.0);
+
 	out.normal = normalize(nvect.xyz);
 	out.texture = v.texture;
 
@@ -97,11 +101,25 @@ constant float specularTightness = 25;
 constant float specularIntensity = 0.75;
 
 fragment float4 fragment_main(VertexOut v [[stage_in]],
-							  texture2d<float, access::sample> texture [[texture(MXTextureIndex0)]])
+							  texture2d<float, access::sample> texture [[texture(MXTextureIndex0)]],
+							  depth2d<float, access::sample> shadowMap [[texture(MXTextureIndexShadow)]])
 {
     constexpr sampler linearSampler (mip_filter::linear,
                                      mag_filter::linear,
                                      min_filter::linear);
+
+	/*
+	 *	Pass in shadow depth texture for shadow mapping
+	 */
+
+	float x = (1 + v.shadow.x / v.shadow.w) / 2;
+	float y = (1 + v.shadow.y / v.shadow.w) / 2;
+	float depth = shadowMap.sample(linearSampler,float2(x,y));
+	float zd = v.shadow.z / v.shadow.w - 0.005;
+
+	/*
+	 *	Calculate the rest
+	 */
 
 	const float3 normalLight = normalize(lightDirection);
 	const float3 normalEye = normalize(eyeDirection);
@@ -111,6 +129,9 @@ fragment float4 fragment_main(VertexOut v [[stage_in]],
 
 	// Ambient lighting
 	float4 ambient = float4(teapotColor * lightColor * ambientIntensity,1.0);
+
+	// Short circuit (TODO)
+	if (zd >= depth) return ambient;
 
 	// Diffuse lighting
 	float dotprod = dot(v.normal,normalLight);

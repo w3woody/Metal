@@ -11,6 +11,9 @@
 #import "MXGeometry.h"
 #import "MXTransformationStack.h"
 
+#define SHADOW_WIDTH	1024
+#define SHADOW_HEIGHT	1024
+
 @interface MXView () <MTKViewDelegate>
 
 // Command queue
@@ -24,6 +27,14 @@
 @property (strong) id<MTLFunction> vertexFunction;
 @property (strong) id<MTLFunction> fragmentFunction;
 @property (strong) id<MTLRenderPipelineState> pipeline;
+
+// Shadow pipeline
+@property (strong) id<MTLFunction> shadowVertexFunction;
+@property (strong) id<MTLFunction> shadowFragmentFunction;
+@property (strong) id<MTLRenderPipelineState> shadowPipeline;
+
+// Shadow map (2D texture of floats)
+@property (strong) id<MTLTexture> shadowMap;
 
 // Depth stencil
 @property (strong) id<MTLDepthStencilState> depth;
@@ -208,6 +219,9 @@
 	self.vertexFunction = [self.library newFunctionWithName:@"vertex_main"];
 	self.fragmentFunction = [self.library newFunctionWithName:@"fragment_main"];
 
+	self.shadowVertexFunction = [self.library newFunctionWithName:@"vertex_shadow"];
+	self.shadowFragmentFunction = [self.library newFunctionWithName:@"fragment_shadow"];
+
 	/*
 	 *	Step 3: Construct our vertex descriptor. We do this to map the
 	 *	offsets in our trangle buffer to the attrite offsets sent to our
@@ -241,11 +255,29 @@
 	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
 	pipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
 
+	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+
 	/*
-	 *	Build our pipeline state object.
+	 *	Next, build our pipeline descriptor for our shadow pipeline
 	 */
 
-	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+	MTLRenderPipelineDescriptor *shadowPipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	shadowPipelineDescriptor.vertexFunction = self.shadowVertexFunction;
+	shadowPipelineDescriptor.fragmentFunction = self.shadowFragmentFunction;
+	shadowPipelineDescriptor.vertexDescriptor = pipelineDescriptor.vertexDescriptor;
+	shadowPipelineDescriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+	shadowPipelineDescriptor.colorAttachments[0].writeMask = MTLColorWriteMaskNone;
+
+	self.shadowPipeline = [self.device newRenderPipelineStateWithDescriptor:shadowPipelineDescriptor error:nil];
+
+	/*
+	 *	Generate a fixed depth texture for shadow mapping
+	 */
+
+	MTLTextureDescriptor *shadowDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float width:SHADOW_WIDTH height:SHADOW_HEIGHT mipmapped:NO];
+	shadowDescriptor.storageMode = MTLStorageModePrivate;
+	shadowDescriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+	self.shadowMap = [self.device newTextureWithDescriptor:shadowDescriptor];
 
 	/*
 	 *	Use the vertex descriptor to load our model.
@@ -255,7 +287,6 @@
 	MTKMeshBufferAllocator *allocator = [[MTKMeshBufferAllocator alloc] initWithDevice:self.device];
 	MDLAsset *asset = [[MDLAsset alloc] initWithURL:modelURL vertexDescriptor:d bufferAllocator:allocator];
 	self.teapot = [MTKMesh newMeshesFromAsset:asset device:self.device sourceMeshes:nil error:nil];
-
 }
 
 /*
@@ -266,6 +297,26 @@
 {
 	self.view = [[MXTransformationStack alloc] init];
 	self.model = [[MXTransformationStack alloc] init];
+}
+
+/****************************************************************************/
+/*																			*/
+/*	Drawing Support															*/
+/*																			*/
+/****************************************************************************/
+#pragma mark - Drawing Support
+
+- (void)renderMesh:(NSArray<MTKMesh *> *)meshArray inEncoder:(id<MTLRenderCommandEncoder>)encoder
+{
+	for (MTKMesh *mesh in meshArray) {
+		MTKMeshBuffer *vertexBuffer = [[mesh vertexBuffers] firstObject];
+		[encoder setVertexBuffer:vertexBuffer.buffer offset:vertexBuffer.offset atIndex:0];
+
+		for (MTKSubmesh *submesh in mesh.submeshes) {
+			MTKMeshBuffer *indexBuffer = submesh.indexBuffer;
+			[encoder drawIndexedPrimitives:submesh.primitiveType indexCount:submesh.indexCount indexType:submesh.indexType indexBuffer:indexBuffer.buffer indexBufferOffset:indexBuffer.offset];
+		}
+	}
 }
 
 /****************************************************************************/
@@ -283,34 +334,11 @@
 
 - (void)drawInMTKView:(MTKView *)view
 {
-	/*
-	 *	First step: get the command buffer.
-	 */
-
-	id<MTLCommandBuffer> buffer = [self.commandQueue commandBuffer];
+	MTLRenderPassDescriptor *descriptor;
+	id<MTLRenderCommandEncoder> encoder;
 
 	/*
-	 *	Third create render command encoder by first building a
-	 *	descriptor and initializing it.
-	 */
-
-	MTLRenderPassDescriptor *descriptor = [view currentRenderPassDescriptor];
-
-	/*
-	 *	Use the descriptor to generate our encoder.
-	 */
-
-	id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
-
-	/*
-	 *	Set up our encoder by indicating the pipeline we will be using for
-	 *	rendering our triangle.
-	 */
-
-	[encoder setRenderPipelineState:self.pipeline];
-
-	/*
-	 *	Update the model transformation
+	 *	Update our model transformation
 	 */
 
 	double elapsed = CACurrentMediaTime() - self.startTime;
@@ -324,45 +352,56 @@
 	u.view = self.view.ctm;
 	u.model = self.model.ctm;
 	u.inverse = self.model.inverseCtm;
+
+	// Generate transformations to figure out light position
+//	[self.view push];
+//	[self.view translateByX:0 y:0 z:-2];
+//	[self.view rotateAroundFixedAxis:MTXXAxis byAngle:0.4];
+////	[self.view rotateAroundFixedAxis:MTXYAxis byAngle:-0.3];
+//	[self.view rotateAroundAxis:(vector_float3){ 0, 1, 0 } byAngle:elapsed];
+//	[self.view scaleBy:2];
+//	u.shadow = self.view.ctm;
+//	[self.view pop];
+
+	u.shadow = simd_mul(self.view.ctm,self.model.ctm);
+
+	/*
+	 *	First step: get the command buffer.
+	 */
+
+	id<MTLCommandBuffer> buffer = [self.commandQueue commandBuffer];
+
+	/*
+	 *	Create the render pass for our first pass for rendering the depth
+	 *	buffer.
+	 */
+
+	descriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+	descriptor.depthAttachment.texture = self.shadowMap;
+	descriptor.depthAttachment.loadAction = MTLLoadActionClear;
+	descriptor.depthAttachment.storeAction = MTLStoreActionStore;
+	descriptor.depthAttachment.clearDepth = 1.0;
+
+	encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+	[encoder setRenderPipelineState:self.shadowPipeline];
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
+	[encoder setDepthStencilState:self.depth];
+	[self renderMesh:self.teapot inEncoder:encoder];
+	[encoder endEncoding];
 
 	/*
-	 *	Enable back-face culling
+	 *	Render pipeline to draw our texture mapped teapot but with shadows.
 	 */
 
-	[encoder setCullMode:MTLCullModeFront];
-
-	/*
-	 *	Set the depth stencil
-	 */
-
+	descriptor = [view currentRenderPassDescriptor];
+	encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+	[encoder setRenderPipelineState:self.pipeline];
+	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 	[encoder setDepthStencilState:self.depth];
 
-	/*
-	 *	Set textures
-	 */
-
 	[encoder setFragmentTexture:self.texture atIndex:MXTextureIndex0];
-
-	/*
-	 *	Now tell our encoder about where our vertex information is located,
-	 *	and ask it to render our triangle.
-	 */
-
-	for (MTKMesh *mesh in self.teapot) {
-		MTKMeshBuffer *vertexBuffer = [[mesh vertexBuffers] firstObject];
-		[encoder setVertexBuffer:vertexBuffer.buffer offset:vertexBuffer.offset atIndex:0];
-
-		for (MTKSubmesh *submesh in mesh.submeshes) {
-			MTKMeshBuffer *indexBuffer = submesh.indexBuffer;
-			[encoder drawIndexedPrimitives:submesh.primitiveType indexCount:submesh.indexCount indexType:submesh.indexType indexBuffer:indexBuffer.buffer indexBufferOffset:indexBuffer.offset];
-		}
-	}
-
-	/*
-	 *	Commit the encoder, which finishes drawing for this rendering pass
-	 */
-
+	[encoder setFragmentTexture:self.shadowMap atIndex:MXTextureIndexShadow];
+	[self renderMesh:self.teapot inEncoder:encoder];
 	[encoder endEncoding];
 
 	/*
