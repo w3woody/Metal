@@ -150,6 +150,7 @@ fragment float4 fragment_main(VertexOut v [[stage_in]],
 	 *	keep the ambient lighting but we skip the diffuse and specular
 	 *	lighting effects.
 	 */
+
 	if (zd >= depth) return ambient;
 
 	/*

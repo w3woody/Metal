@@ -341,7 +341,7 @@
 	 *	Update our model transformation
 	 */
 
-	double elapsed = 2.1;// CACurrentMediaTime() - self.startTime;
+	double elapsed = CACurrentMediaTime() - self.startTime;
 	[self.model clear];
 	[self.model translateByX:0 y:0 z:-2];
 	[self.model rotateAroundFixedAxis:MTXXAxis byAngle:0.4];
