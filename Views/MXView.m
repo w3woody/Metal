@@ -341,7 +341,7 @@
 	 *	Update our model transformation
 	 */
 
-	double elapsed = CACurrentMediaTime() - self.startTime;
+	double elapsed = 2.1;// CACurrentMediaTime() - self.startTime;
 	[self.model clear];
 	[self.model translateByX:0 y:0 z:-2];
 	[self.model rotateAroundFixedAxis:MTXXAxis byAngle:0.4];
@@ -353,17 +353,26 @@
 	u.model = self.model.ctm;
 	u.inverse = self.model.inverseCtm;
 
-	// Generate transformations to figure out light position
-//	[self.view push];
-//	[self.view translateByX:0 y:0 z:-2];
-//	[self.view rotateAroundFixedAxis:MTXXAxis byAngle:0.4];
-////	[self.view rotateAroundFixedAxis:MTXYAxis byAngle:-0.3];
-//	[self.view rotateAroundAxis:(vector_float3){ 0, 1, 0 } byAngle:elapsed];
-//	[self.view scaleBy:2];
-//	u.shadow = self.view.ctm;
-//	[self.view pop];
+	/*
+	 *	Populate u.shadow with the transformation which renders our scene from
+	 *	the point of view of the light. For our test we simply recreate the
+	 *	model/view transformation on the view stack, but rotating the
+	 *	scene by anextra -0.3 radians, which is approximately where our
+	 *	light is in our tests.
+	 *
+	 *	A more sophisticated system would actually figure out the location of
+	 *	the light
+	 */
 
-	u.shadow = simd_mul(self.view.ctm,self.model.ctm);
+	// Generate transformations to figure out light position
+	[self.view push];
+	[self.view translateByX:0 y:0 z:-2];
+	[self.view rotateAroundFixedAxis:MTXXAxis byAngle:0.4];
+	[self.view rotateAroundFixedAxis:MTXYAxis byAngle:-0.3];
+	[self.view rotateAroundAxis:(vector_float3){ 0, 1, 0 } byAngle:elapsed];
+	[self.view scaleBy:2];
+	u.shadow = self.view.ctm;
+	[self.view pop];
 
 	/*
 	 *	First step: get the command buffer.

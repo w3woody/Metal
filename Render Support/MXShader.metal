@@ -67,10 +67,10 @@ vertex VertexOut vertex_main(VertexIn v [[stage_in]],
 
 	float4 worldPosition = u.model * float4(v.position,1.0);
 	out.position = u.view * worldPosition;
-	float4 nvect = float4(v.normal,0) * u.inverse;
-	
+
 	out.shadow = u.shadow * float4(v.position,1.0);
 
+	float4 nvect = float4(v.normal,0) * u.inverse;
 	out.normal = normalize(nvect.xyz);
 	out.texture = v.texture;
 
@@ -110,12 +110,27 @@ fragment float4 fragment_main(VertexOut v [[stage_in]],
 
 	/*
 	 *	Pass in shadow depth texture for shadow mapping
+	 *
+	 *	Note that because we're using a perspective matrix we must correct
+	 *	by dividing for w on each pixel. We must also remap our (x,y)
+	 *	coordinate to deal with the fact that our geometry's coordinate
+	 *	system runs [-1,1],[-1,1] from lower-left to upper-right, but
+	 *	our texture coordinate system runs [0,1][0,1] from upper-left
+	 *	to lower-right.
+	 *
+	 *	Note if we were representing a light at infinity, we would use
+	 *	an orthographic transformation--meaning we would not have
+	 *	to deal with dividing by w, since in an orthographic projection,
+	 *	w = 1.
+	 *
+	 *	And if we were to do that, we can move most of the heavy lifting
+	 *	for our texture coordinate transformation into the vertex shader.
 	 */
 
 	float x = (1 + v.shadow.x / v.shadow.w) / 2;
-	float y = (1 + v.shadow.y / v.shadow.w) / 2;
+	float y = (1 - v.shadow.y / v.shadow.w) / 2;
 	float depth = shadowMap.sample(linearSampler,float2(x,y));
-	float zd = v.shadow.z / v.shadow.w - 0.005;
+	float zd = v.shadow.z / v.shadow.w - 0.001;
 
 	/*
 	 *	Calculate the rest
@@ -130,8 +145,16 @@ fragment float4 fragment_main(VertexOut v [[stage_in]],
 	// Ambient lighting
 	float4 ambient = float4(teapotColor * lightColor * ambientIntensity,1.0);
 
-	// Short circuit (TODO)
+	/*
+	 *	If zd is greater than depth, this means we're in the shadow. We
+	 *	keep the ambient lighting but we skip the diffuse and specular
+	 *	lighting effects.
+	 */
 	if (zd >= depth) return ambient;
+
+	/*
+	 *	Not in the shadows. Perform the rest of the calculations
+	 */
 
 	// Diffuse lighting
 	float dotprod = dot(v.normal,normalLight);
