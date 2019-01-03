@@ -71,16 +71,15 @@ vertex VertexOut vertex_fairy(VertexIn v [[stage_in]],
 {
 	VertexOut out;
 
-	// Pass through UV/color
-	out.uv = (v.position + 1)/2;
-	out.color = positions[iid].color;
-
 	// Transform location and offset
 	float4 screenPos = u.view * u.model * float4(positions[iid].position,1.0);
 	// Offset the X/Y location
 	screenPos.xy += v.position * 0.03 * positions[iid].size / screenPos.w;
-
 	out.position = screenPos;
+
+	// Pass through UV/color
+	out.uv = (v.position + 1)/2;
+	out.color = positions[iid].color;
 	return out;
 }
 
@@ -97,7 +96,7 @@ fragment float4 fragment_fairy(VertexOut v [[stage_in]],
 									min_filter::linear);
 
 	float4 c = fairyTexture.sample(linearSampler,v.uv);
-	float3 halfColor = v.color * c.x;
-	return float4(halfColor,c.x);
+	float3 color = v.color * c.x;
+	return float4(color,c.x);
 }
 
