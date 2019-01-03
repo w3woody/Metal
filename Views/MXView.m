@@ -398,10 +398,16 @@
 	 *	Fairy lights pipeline renderer
 	 */
 
+	MTLVertexDescriptor *fairyDescriptors = [[MTLVertexDescriptor alloc] init];
+	fairyDescriptors.attributes[MXAttributeIndexPosition].format = MTLVertexFormatFloat2;
+	fairyDescriptors.attributes[MXAttributeIndexPosition].offset = 0;
+	fairyDescriptors.attributes[MXAttributeIndexPosition].bufferIndex = 0;
+	fairyDescriptors.layouts[0].stride = sizeof(MXFairyVertex);
+
 	MTLRenderPipelineDescriptor *fairyPipelineDescriptor = [MTLRenderPipelineDescriptor new];
 	fairyPipelineDescriptor.vertexFunction = self.fairyVertexFunction;
 	fairyPipelineDescriptor.fragmentFunction = self.fairyFragmentFunction;
-	fairyPipelineDescriptor.vertexDescriptor = pipelineDescriptor.vertexDescriptor;
+	fairyPipelineDescriptor.vertexDescriptor = fairyDescriptors;
 	fairyPipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
 	fairyPipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
 

@@ -64,22 +64,21 @@ struct VertexOut
  *	depth, so this skips initializing a bunch of stuff.
  */
 
-vertex VertexOut vertex_fairy(constant VertexIn *v [[buffer(MXVertexIndexVertices)]],
+vertex VertexOut vertex_fairy(VertexIn v [[stage_in]],
 							  constant MXUniforms &u [[buffer(MXVertexIndexUniforms)]],
 							  constant FairyLightIn *positions [[buffer(MXVertexIndexLocations)]],
-							  uint vid [[vertex_id]],
 							  uint iid [[instance_id]])
 {
 	VertexOut out;
 
 	// Pass through UV/color
-	out.uv = (v[vid].position + 1)/2;
+	out.uv = (v.position + 1)/2;
 	out.color = positions[iid].color;
 
 	// Transform location and offset
 	float4 screenPos = u.view * u.model * float4(positions[iid].position,1.0);
 	// Offset the X/Y location
-	screenPos.xy += v[vid].position * 0.03 * positions[iid].size / screenPos.w;
+	screenPos.xy += v.position * 0.03 * positions[iid].size / screenPos.w;
 
 	out.position = screenPos;
 	return out;
