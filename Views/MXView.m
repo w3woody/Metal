@@ -11,16 +11,23 @@
 #import "MXGeometry.h"
 #import "MXTransformationStack.h"
 
+#define MAX_FAIRYLIGHTS	20					// 20 lights
+
 #define SHADOW_WIDTH	1024
 #define SHADOW_HEIGHT	1024
 
 @interface MXView () <MTKViewDelegate>
+{
+	// The fairy lights as a fixed sized array
+	MXFairyLocation fairyLights[MAX_FAIRYLIGHTS];
+}
 
 // Command queue
 @property (strong) id<MTLCommandQueue> commandQueue;
 
 // The teapot, as a collection of meshes
 @property (strong) NSArray<MTKMesh *> *teapot;
+@property (strong) id<MTLBuffer> fairySquare;
 
 // Pipeline state stuff
 @property (strong) id<MTLLibrary> library;
@@ -33,14 +40,21 @@
 @property (strong) id<MTLFunction> shadowFragmentFunction;
 @property (strong) id<MTLRenderPipelineState> shadowPipeline;
 
+// Fairy pipeline
+@property (strong) id<MTLFunction> fairyVertexFunction;
+@property (strong) id<MTLFunction> fairyFragmentFunction;
+@property (strong) id<MTLRenderPipelineState> fairyPipeline;
+
 // Shadow map (2D texture of floats)
 @property (strong) id<MTLTexture> shadowMap;
 
 // Depth stencil
 @property (strong) id<MTLDepthStencilState> depth;
+@property (strong) id<MTLDepthStencilState> fairyDepth;
 
 // Textures and support
 @property (strong) id<MTLTexture> texture;
+@property (strong) id<MTLTexture> fairyTexture;
 
 // Transformation matrices
 @property (strong) MXTransformationStack *view;
@@ -104,11 +118,106 @@
 	[self setupTransformation];
 	[self setupDepthStencilState];
 	[self setupTextures];
+	[self setupFairyVertex];
+	[self setupFairyLights];
 
 	// Kludge to make sure our size is drawin in the proper order
 	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
 		[self mtkView:self drawableSizeWillChange:self.bounds.size];
 	});
+}
+
+/****************************************************************************/
+/*																			*/
+/*	Randomly populate fairy lights											*/
+/*																			*/
+/****************************************************************************/
+#pragma mark - Texture Loading
+
+- (void)setupFairyVertex
+{
+	static const MXFairyVertex square[] = {
+		{ { -1, -1 } },
+		{ { -1,  1 } },
+		{ {  1, -1 } },
+		{ { -1,  1 } },
+		{ {  1, -1 } },
+		{ {  1,  1 } }
+	};
+	self.fairySquare = [self.device newBufferWithBytes:square length:sizeof(square) options:MTLResourceOptionCPUCacheModeDefault];
+}
+
+- (void)setupFairyLights
+{
+	srand((unsigned int)time(NULL));
+
+	for (int i = 0; i < MAX_FAIRYLIGHTS; ++i) {
+		MXFairyLocation *l = fairyLights + i;
+
+		/*
+		 *	Randomly pick a color
+		 */
+
+		int c = (rand() % 6);
+		if (c < 0) c += 6;
+		switch (c) {
+			default:
+			case 0:
+				l->color[0] = 1;
+				l->color[1] = 0;
+				l->color[2] = 0;
+				break;
+			case 1:
+				l->color[0] = 0;
+				l->color[1] = 1;
+				l->color[2] = 0;
+				break;
+			case 2:
+				l->color[0] = 0;
+				l->color[1] = 0;
+				l->color[2] = 1;
+				break;
+			case 3:
+				l->color[0] = 1;
+				l->color[1] = 1;
+				l->color[2] = 0;
+				break;
+			case 4:
+				l->color[0] = 0;
+				l->color[1] = 1;
+				l->color[2] = 1;
+				break;
+			case 5:
+				l->color[0] = 1;
+				l->color[1] = 0;
+				l->color[2] = 1;
+				break;
+		}
+
+		/*
+		 *	Randomly pick a starting angle and speed
+		 */
+
+		int x = rand() % 360;
+		if (x < 0) x += 360;
+
+		l->angle[0] = x * M_PI / 180.0;
+
+		int y = rand() % 30;
+		if (y < 0) y += 30;
+		y -= 15;
+		l->angle[1] = y * M_PI / 180.0;
+
+		int speed = rand() % 100;
+		if (speed < 0) speed += 100;
+		l->speed = speed / 50.0;
+
+		int radius = rand() % 100;
+		if (radius < 0) radius += 100;
+		l->radius = 0.4 + radius/1500.0;
+
+		l->size = 5;
+	}
 }
 
 /****************************************************************************/
@@ -131,6 +240,7 @@
 	 */
 
 	self.texture = [textureLoader newTextureWithName:@"texture" scaleFactor:1.0 bundle:nil options:@{} error:nil];
+	self.fairyTexture = [textureLoader newTextureWithName:@"fairy" scaleFactor:1.0 bundle:nil options:@{} error:nil];
 }
 
 /****************************************************************************/
@@ -190,6 +300,17 @@
 	[depthDescriptor setDepthWriteEnabled:YES];
 
 	self.depth = [self.device newDepthStencilStateWithDescriptor:depthDescriptor];
+
+	/*
+	 *	Set up the depth stencil for our fairy lights. We disable writing to
+	 *	the depth buffer so our fairy lights do not intefere with each other.
+	 */
+
+	MTLDepthStencilDescriptor *fairyDepthDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+	fairyDepthDescriptor.depthCompareFunction = MTLCompareFunctionLess;
+	[fairyDepthDescriptor setDepthWriteEnabled:NO];
+
+	self.fairyDepth = [self.device newDepthStencilStateWithDescriptor:fairyDepthDescriptor];
 }
 
 /*
@@ -221,6 +342,9 @@
 
 	self.shadowVertexFunction = [self.library newFunctionWithName:@"vertex_shadow"];
 	self.shadowFragmentFunction = [self.library newFunctionWithName:@"fragment_shadow"];
+
+	self.fairyVertexFunction = [self.library newFunctionWithName:@"vertex_fairy"];
+	self.fairyFragmentFunction = [self.library newFunctionWithName:@"fragment_fairy"];
 
 	/*
 	 *	Step 3: Construct our vertex descriptor. We do this to map the
@@ -271,6 +395,27 @@
 	self.shadowPipeline = [self.device newRenderPipelineStateWithDescriptor:shadowPipelineDescriptor error:nil];
 
 	/*
+	 *	Fairy lights pipeline renderer
+	 */
+
+	MTLRenderPipelineDescriptor *fairyPipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	fairyPipelineDescriptor.vertexFunction = self.fairyVertexFunction;
+	fairyPipelineDescriptor.fragmentFunction = self.fairyFragmentFunction;
+	fairyPipelineDescriptor.vertexDescriptor = pipelineDescriptor.vertexDescriptor;
+	fairyPipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
+	fairyPipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+
+	fairyPipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
+	fairyPipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+	fairyPipelineDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+	fairyPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+	fairyPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+	fairyPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+	fairyPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+
+	self.fairyPipeline = [self.device newRenderPipelineStateWithDescriptor:fairyPipelineDescriptor error:nil];
+
+	/*
 	 *	Generate a fixed depth texture for shadow mapping
 	 */
 
@@ -310,7 +455,7 @@
 {
 	for (MTKMesh *mesh in meshArray) {
 		MTKMeshBuffer *vertexBuffer = [[mesh vertexBuffers] firstObject];
-		[encoder setVertexBuffer:vertexBuffer.buffer offset:vertexBuffer.offset atIndex:0];
+		[encoder setVertexBuffer:vertexBuffer.buffer offset:vertexBuffer.offset atIndex:MXVertexIndexVertices];
 
 		for (MTKSubmesh *submesh in mesh.submeshes) {
 			MTKMeshBuffer *indexBuffer = submesh.indexBuffer;
@@ -375,7 +520,8 @@
 	[self.view pop];
 
 	/*
-	 *	First step: get the command buffer.
+	 *	First step: get the command buffer. We delay if we're still drawing
+	 *	a frame.
 	 */
 
 	id<MTLCommandBuffer> buffer = [self.commandQueue commandBuffer];
@@ -404,13 +550,39 @@
 
 	descriptor = [view currentRenderPassDescriptor];
 	encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
 	[encoder setRenderPipelineState:self.pipeline];
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 	[encoder setDepthStencilState:self.depth];
-
 	[encoder setFragmentTexture:self.texture atIndex:MXTextureIndex0];
 	[encoder setFragmentTexture:self.shadowMap atIndex:MXTextureIndexShadow];
 	[self renderMesh:self.teapot inEncoder:encoder];
+
+	/*
+	 *	Render fairy lights
+	 */
+
+	for (int i = 0; i < MAX_FAIRYLIGHTS; ++i) {
+		MXFairyLocation *loc = fairyLights + i;
+
+		float a = loc->angle[0] + loc->speed * elapsed;
+
+		float sx = sinf(a);
+		float cx = cosf(a);
+		float sy = sinf(loc->angle[1]);
+		float cy = cosf(loc->angle[1]);
+
+		loc->position[0] = cx * cy * loc->radius;
+		loc->position[2] = sx * cy * loc->radius;
+		loc->position[1] = sy * loc->radius;
+	}
+	[encoder setRenderPipelineState:self.fairyPipeline];
+	[encoder setDepthStencilState:self.fairyDepth];
+	[encoder setVertexBuffer:self.fairySquare offset:0 atIndex:MXVertexIndexVertices];
+	[encoder setVertexBytes:fairyLights length:sizeof(fairyLights) atIndex:MXVertexIndexLocations];
+	[encoder setFragmentTexture:self.fairyTexture atIndex:MXTextureIndex0];
+	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6 instanceCount:MAX_FAIRYLIGHTS];
+
 	[encoder endEncoding];
 
 	/*

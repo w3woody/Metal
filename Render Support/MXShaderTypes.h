@@ -21,6 +21,7 @@ typedef enum MXVertexIndex
 {
 	MXVertexIndexVertices = 0,		/* For [[stage_in]], the vertex buffer MUST BE 0 */
 	MXVertexIndexUniforms = 1,		/* Location of uniforms */
+	MXVertexIndexLocations = 2,		/* Locations of our fairy lights */
 } MXVertexIndex;
 
 /*
@@ -32,6 +33,9 @@ typedef enum MXAttributeIndex
 	MXAttributeIndexPosition = 0,
 	MXAttributeIndexNormal = 1,
 	MXAttributeIndexTexture = 2,
+
+	MXAttributeIndexUV = 1,			// UV of our matrix
+	MXAttributeIndexColor = 2,		// attribute index for fairy lights
 } MXAttributeIndex;
 
 /*
