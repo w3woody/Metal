@@ -20,6 +20,8 @@
 		EF4D1EC321D71955001D7137 /* teapot.obj in Resources */ = {isa = PBXBuildFile; fileRef = EF4D1EC221D71955001D7137 /* teapot.obj */; };
 		EF4D1ECB21DC18A7001D7137 /* MXShadow.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1ECA21DC18A6001D7137 /* MXShadow.metal */; };
 		EF610B9E21DD9A490068D5FF /* MXFairy.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF610B9D21DD9A490068D5FF /* MXFairy.metal */; };
+		EF610BA021DEE8E60068D5FF /* MXGBufferShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */; };
+		EF610BA221DEFCAD0068D5FF /* MXGBufferRender.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF610BA121DEFCAD0068D5FF /* MXGBufferRender.metal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,8 @@
 		EF4D1EC221D71955001D7137 /* teapot.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = teapot.obj; sourceTree = "<group>"; };
 		EF4D1ECA21DC18A6001D7137 /* MXShadow.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXShadow.metal; sourceTree = "<group>"; };
 		EF610B9D21DD9A490068D5FF /* MXFairy.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXFairy.metal; sourceTree = "<group>"; };
+		EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXGBufferShader.metal; sourceTree = "<group>"; };
+		EF610BA121DEFCAD0068D5FF /* MXGBufferRender.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXGBufferRender.metal; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -131,6 +135,8 @@
 				EF4D1EBC21D57FBA001D7137 /* MXShader.metal */,
 				EF4D1ECA21DC18A6001D7137 /* MXShadow.metal */,
 				EF610B9D21DD9A490068D5FF /* MXFairy.metal */,
+				EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */,
+				EF610BA121DEFCAD0068D5FF /* MXGBufferRender.metal */,
 			);
 			path = "Render Support";
 			sourceTree = "<group>";
@@ -217,6 +223,8 @@
 			files = (
 				EF4D1EBD21D57FBA001D7137 /* MXShader.metal in Sources */,
 				EF4D1EA021D5536A001D7137 /* MXViewController.m in Sources */,
+				EF610BA221DEFCAD0068D5FF /* MXGBufferRender.metal in Sources */,
+				EF610BA021DEE8E60068D5FF /* MXGBufferShader.metal in Sources */,
 				EF4D1ECB21DC18A7001D7137 /* MXShadow.metal in Sources */,
 				EF4D1EA821D5536A001D7137 /* main.m in Sources */,
 				EF4D1EC121D69A4A001D7137 /* MXTransformationStack.m in Sources */,

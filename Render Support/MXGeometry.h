@@ -74,4 +74,5 @@ typedef struct MXFairyLocation
 	float radius;
 } MXFairyLocation;
 
+
 #endif /* MXGeometry_h */

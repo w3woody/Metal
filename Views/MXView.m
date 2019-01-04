@@ -27,13 +27,10 @@
 
 // The teapot, as a collection of meshes
 @property (strong) NSArray<MTKMesh *> *teapot;
-@property (strong) id<MTLBuffer> fairySquare;
+@property (strong) id<MTLBuffer> square;
 
 // Pipeline state stuff
 @property (strong) id<MTLLibrary> library;
-@property (strong) id<MTLFunction> vertexFunction;
-@property (strong) id<MTLFunction> fragmentFunction;
-@property (strong) id<MTLRenderPipelineState> pipeline;
 
 // Shadow pipeline
 @property (strong) id<MTLFunction> shadowVertexFunction;
@@ -45,12 +42,28 @@
 @property (strong) id<MTLFunction> fairyFragmentFunction;
 @property (strong) id<MTLRenderPipelineState> fairyPipeline;
 
+// GBuffer pipeline
+@property (strong) id<MTLFunction> gVertexFunction;
+@property (strong) id<MTLFunction> gFragmentFunction;
+@property (strong) id<MTLRenderPipelineState> gPipeline;
+
+// GBuffer rendering
+@property (strong) id<MTLFunction> grVertexFunction;
+@property (strong) id<MTLFunction> grFragmentFunction;
+@property (strong) id<MTLRenderPipelineState> grPipeline;
+
 // Shadow map (2D texture of floats)
 @property (strong) id<MTLTexture> shadowMap;
+
+// G-Buffer
+@property (strong) id<MTLTexture> colorMap;
+@property (strong) id<MTLTexture> normalMap;
 
 // Depth stencil
 @property (strong) id<MTLDepthStencilState> depth;
 @property (strong) id<MTLDepthStencilState> fairyDepth;
+@property (strong) id<MTLDepthStencilState> drawStencil;
+@property (strong) id<MTLDepthStencilState> maskStencil;
 
 // Textures and support
 @property (strong) id<MTLTexture> texture;
@@ -129,6 +142,34 @@
 
 /****************************************************************************/
 /*																			*/
+/*	GBuffer Setup															*/
+/*																			*/
+/****************************************************************************/
+#pragma mark - Texture Loading
+
+/*
+ *	Generate the textures used for our gbuffer when the screen resizes
+ */
+
+- (void)setupGBufferTexturesWithSize:(CGSize)size
+{
+	MTLTextureDescriptor *gbufferDescriptor;
+
+	// Color map
+	gbufferDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float width:size.width height:size.height mipmapped:NO];
+	gbufferDescriptor.storageMode = MTLStorageModePrivate;
+	gbufferDescriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+	self.colorMap = [self.device newTextureWithDescriptor:gbufferDescriptor];
+
+	// normal vectors
+	gbufferDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float width:size.width height:size.height mipmapped:NO];
+	gbufferDescriptor.storageMode = MTLStorageModePrivate;
+	gbufferDescriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+	self.normalMap = [self.device newTextureWithDescriptor:gbufferDescriptor];
+}
+
+/****************************************************************************/
+/*																			*/
 /*	Randomly populate fairy lights											*/
 /*																			*/
 /****************************************************************************/
@@ -144,7 +185,7 @@
 		{ {  1, -1 } },
 		{ {  1,  1 } }
 	};
-	self.fairySquare = [self.device newBufferWithBytes:square length:sizeof(square) options:MTLResourceOptionCPUCacheModeDefault];
+	self.square = [self.device newBufferWithBytes:square length:sizeof(square) options:MTLResourceOptionCPUCacheModeDefault];
 }
 
 - (void)setupFairyLights
@@ -274,7 +315,7 @@
 
 	self.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
 	self.clearColor = MTLClearColorMake(0.1, 0.1, 0.2, 1.0);
-	self.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
+	self.depthStencilPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
 
 	// The following two calls essentially change the behavior of our view
 	// so that it only updates on setNeedsDisplay. This behavior is useful
@@ -311,6 +352,41 @@
 	[fairyDepthDescriptor setDepthWriteEnabled:NO];
 
 	self.fairyDepth = [self.device newDepthStencilStateWithDescriptor:fairyDepthDescriptor];
+
+	/*
+	 *	Set up the depth stencil for our gbuffer renderer. This flips the
+	 *	stencil value for the pixels we draw in, so on our second pass
+	 *	coloring our surface, we only color the pixels that have content in
+	 *	them.
+	 */
+
+	MTLDepthStencilDescriptor *drawStencilDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+	drawStencilDescriptor.depthCompareFunction = MTLCompareFunctionLess;
+	[drawStencilDescriptor setDepthWriteEnabled:YES];
+
+	MTLStencilDescriptor *drawStencil = [[MTLStencilDescriptor alloc] init];
+	drawStencil.stencilCompareFunction = MTLCompareFunctionAlways;
+	drawStencil.depthStencilPassOperation = MTLStencilOperationReplace;
+	drawStencilDescriptor.backFaceStencil = drawStencil;
+	drawStencilDescriptor.frontFaceStencil = drawStencil;
+
+	self.drawStencil = [self.device newDepthStencilStateWithDescriptor:drawStencilDescriptor];
+
+	/*
+	 *	Set up the mask stencil. This causes our renderer to only operate on
+	 *	pixels that have been filled in
+	 */
+
+	MTLDepthStencilDescriptor *maskStencilDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+	maskStencilDescriptor.depthCompareFunction = MTLCompareFunctionLess;
+	[maskStencilDescriptor setDepthWriteEnabled:NO];
+
+	MTLStencilDescriptor *maskStencil = [[MTLStencilDescriptor alloc] init];
+	maskStencil.stencilCompareFunction = MTLCompareFunctionEqual;
+	maskStencilDescriptor.backFaceStencil = maskStencil;
+	maskStencilDescriptor.frontFaceStencil = maskStencil;
+
+	self.maskStencil = [self.device newDepthStencilStateWithDescriptor:maskStencilDescriptor];
 }
 
 /*
@@ -337,14 +413,17 @@
 	 *	same names as the functions declared in our MXShader file.
 	 */
 
-	self.vertexFunction = [self.library newFunctionWithName:@"vertex_main"];
-	self.fragmentFunction = [self.library newFunctionWithName:@"fragment_main"];
-
 	self.shadowVertexFunction = [self.library newFunctionWithName:@"vertex_shadow"];
 	self.shadowFragmentFunction = [self.library newFunctionWithName:@"fragment_shadow"];
 
 	self.fairyVertexFunction = [self.library newFunctionWithName:@"vertex_fairy"];
 	self.fairyFragmentFunction = [self.library newFunctionWithName:@"fragment_fairy"];
+
+	self.gVertexFunction = [self.library newFunctionWithName:@"vertex_gbuffer"];
+	self.gFragmentFunction = [self.library newFunctionWithName:@"fragment_gbuffer"];
+
+	self.grVertexFunction = [self.library newFunctionWithName:@"vertex_grender"];
+	self.grFragmentFunction = [self.library newFunctionWithName:@"fragment_grender"];
 
 	/*
 	 *	Step 3: Construct our vertex descriptor. We do this to map the
@@ -364,23 +443,6 @@
 	d.attributes[2] = [[MDLVertexAttribute alloc] initWithName:MDLVertexAttributeTextureCoordinate format:MDLVertexFormatFloat2 offset:sizeof(vector_float3) * 2 bufferIndex:0];
 	d.layouts[0] = [[MDLVertexBufferLayout alloc] initWithStride:sizeof(MXVertex)];
 
-
-	/*
-	 *	Step 4: Start building the pipeline descriptor. This is used to
-	 *	eventually build our pipeline state. Note if we were doing anything
-	 *	more complicated with our pipeline (such as using stencils or depth
-	 *	detection for 3D rendering) we'd set that stuff here.
-	 */
-
-	MTLRenderPipelineDescriptor *pipelineDescriptor = [MTLRenderPipelineDescriptor new];
-	pipelineDescriptor.vertexFunction = self.vertexFunction;
-	pipelineDescriptor.fragmentFunction = self.fragmentFunction;
-	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
-	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
-	pipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
-
-	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
-
 	/*
 	 *	Next, build our pipeline descriptor for our shadow pipeline
 	 */
@@ -388,7 +450,7 @@
 	MTLRenderPipelineDescriptor *shadowPipelineDescriptor = [MTLRenderPipelineDescriptor new];
 	shadowPipelineDescriptor.vertexFunction = self.shadowVertexFunction;
 	shadowPipelineDescriptor.fragmentFunction = self.shadowFragmentFunction;
-	shadowPipelineDescriptor.vertexDescriptor = pipelineDescriptor.vertexDescriptor;
+	shadowPipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
 	shadowPipelineDescriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
 	shadowPipelineDescriptor.colorAttachments[0].writeMask = MTLColorWriteMaskNone;
 
@@ -409,6 +471,7 @@
 	fairyPipelineDescriptor.fragmentFunction = self.fairyFragmentFunction;
 	fairyPipelineDescriptor.vertexDescriptor = fairyDescriptors;
 	fairyPipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
+	fairyPipelineDescriptor.stencilAttachmentPixelFormat = self.depthStencilPixelFormat;
 	fairyPipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
 
 	fairyPipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
@@ -420,6 +483,35 @@
 	fairyPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
 
 	self.fairyPipeline = [self.device newRenderPipelineStateWithDescriptor:fairyPipelineDescriptor error:nil];
+
+	/*
+	 *	GBuffer pipeline
+	 */
+
+	MTLRenderPipelineDescriptor *gBufferPipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	gBufferPipelineDescriptor.vertexFunction = self.gVertexFunction;
+	gBufferPipelineDescriptor.fragmentFunction = self.gFragmentFunction;
+	gBufferPipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+	gBufferPipelineDescriptor.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA32Float;
+	gBufferPipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
+	gBufferPipelineDescriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+	gBufferPipelineDescriptor.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+
+	self.gPipeline = [self.device newRenderPipelineStateWithDescriptor:gBufferPipelineDescriptor error:nil];
+
+	/*
+	 *	GBuffer rendering pipeline
+	 */
+
+	MTLRenderPipelineDescriptor *grBufferPipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	grBufferPipelineDescriptor.vertexFunction = self.grVertexFunction;
+	grBufferPipelineDescriptor.fragmentFunction = self.grFragmentFunction;
+	grBufferPipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+	grBufferPipelineDescriptor.vertexDescriptor = fairyDescriptors;
+	grBufferPipelineDescriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+	grBufferPipelineDescriptor.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+
+	self.grPipeline = [self.device newRenderPipelineStateWithDescriptor:grBufferPipelineDescriptor error:nil];
 
 	/*
 	 *	Generate a fixed depth texture for shadow mapping
@@ -481,12 +573,23 @@
 {
 	[self.view clear];
 	[self.view perspective:M_PI/3 aspect:size.width/size.height near:0.1 far:1000];
+
+	[self setupGBufferTexturesWithSize:size];
 }
 
 - (void)drawInMTKView:(MTKView *)view
 {
 	MTLRenderPassDescriptor *descriptor;
 	id<MTLRenderCommandEncoder> encoder;
+
+	/*
+	 *	Test to see if we've constructed our G Buffer. If we haven't we
+	 *	completely skip all of this. (That's because sometimes our
+	 *	mtxView call is made before the drawing, and sometimes it happens
+	 *	afterwards.)
+	 */
+
+	if (self.colorMap == nil) return;
 
 	/*
 	 *	Update our model transformation
@@ -533,8 +636,7 @@
 	id<MTLCommandBuffer> buffer = [self.commandQueue commandBuffer];
 
 	/*
-	 *	Create the render pass for our first pass for rendering the depth
-	 *	buffer.
+	 *	Create the render pass for our first pass for rendering the shadow mask
 	 */
 
 	descriptor = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -551,18 +653,57 @@
 	[encoder endEncoding];
 
 	/*
-	 *	Render pipeline to draw our texture mapped teapot but with shadows.
+	 *	Create the render pass for rendering our gbuffer
 	 */
 
-	descriptor = [view currentRenderPassDescriptor];
+	descriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+	descriptor.depthAttachment.texture = self.depthStencilTexture;
+	descriptor.depthAttachment.loadAction = MTLLoadActionClear;
+	descriptor.depthAttachment.storeAction = MTLStoreActionStore;
+	descriptor.depthAttachment.clearDepth = 1.0;
+	descriptor.stencilAttachment.texture = self.depthStencilTexture;
+	descriptor.stencilAttachment.loadAction = MTLLoadActionClear;
+	descriptor.stencilAttachment.storeAction = MTLStoreActionStore;
+	descriptor.stencilAttachment.clearStencil = 0;
+
+	descriptor.colorAttachments[MXColorIndexColor].texture = self.colorMap;
+	descriptor.colorAttachments[MXColorIndexColor].clearColor = MTLClearColorMake(0.1, 0.1, 0.2, 1.0);
+	descriptor.colorAttachments[MXColorIndexColor].loadAction = MTLLoadActionClear;
+	descriptor.colorAttachments[MXColorIndexColor].storeAction = MTLStoreActionStore;
+	descriptor.colorAttachments[MXColorIndexNormal].texture = self.normalMap;
+	descriptor.colorAttachments[MXColorIndexNormal].clearColor = MTLClearColorMake(1, 0, 0, 0);
+	descriptor.colorAttachments[MXColorIndexNormal].loadAction = MTLLoadActionClear;
+	descriptor.colorAttachments[MXColorIndexNormal].storeAction = MTLStoreActionStore;
 	encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
 
-	[encoder setRenderPipelineState:self.pipeline];
+	[encoder setRenderPipelineState:self.gPipeline];
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
-	[encoder setDepthStencilState:self.depth];
+	[encoder setDepthStencilState:self.drawStencil];
+	[encoder setStencilReferenceValue:1];
 	[encoder setFragmentTexture:self.texture atIndex:MXTextureIndex0];
 	[encoder setFragmentTexture:self.shadowMap atIndex:MXTextureIndexShadow];
 	[self renderMesh:self.teapot inEncoder:encoder];
+	[encoder endEncoding];
+
+	/*
+	 *	Render pipeline to draw our teapot from the gbuffer data. This basically
+	 *	draws a square, passing in the color and normal data from the GBuffer
+	 *	to actually handle shading.
+	 */
+
+	descriptor = [view currentRenderPassDescriptor];
+	descriptor.depthAttachment.loadAction = MTLLoadActionLoad;
+	descriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
+	encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
+	[encoder setRenderPipelineState:self.grPipeline];
+	[encoder setStencilReferenceValue:1];
+	[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+	[encoder setDepthStencilState:self.maskStencil];
+	[encoder setFragmentTexture:self.colorMap atIndex:MXTextureIndexColor];
+	[encoder setFragmentTexture:self.normalMap atIndex:MXTextureIndexNormal];
+	[encoder setFragmentTexture:self.depthStencilTexture atIndex:MXTextureIndexDepth];
+	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
 
 	/*
 	 *	Render fairy lights
@@ -584,7 +725,8 @@
 	}
 	[encoder setRenderPipelineState:self.fairyPipeline];
 	[encoder setDepthStencilState:self.fairyDepth];
-	[encoder setVertexBuffer:self.fairySquare offset:0 atIndex:MXVertexIndexVertices];
+	[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 	[encoder setVertexBytes:fairyLights length:sizeof(fairyLights) atIndex:MXVertexIndexLocations];
 	[encoder setFragmentTexture:self.fairyTexture atIndex:MXTextureIndex0];
 	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6 instanceCount:MAX_FAIRYLIGHTS];

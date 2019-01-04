@@ -46,7 +46,20 @@ typedef enum MXTextureIndex
 {
 	MXTextureIndex0 = 0,
 	MXTextureIndexShadow = 1,
+	MXTextureIndexColor = 0,		// gbuffer
+	MXTextureIndexNormal = 1,
+	MXTextureIndexDepth = 2,
 } MXTextureIndex;
+
+/*
+ *	Attribute indexes. This is the same idea as above, but for attributes.
+ */
+
+typedef enum MXColorIndex
+{
+	MXColorIndexColor = 0,
+	MXColorIndexNormal = 1,
+} MXColorIndex;
 
 /*
  *	Uniforms structure
