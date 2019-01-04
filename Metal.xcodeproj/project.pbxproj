@@ -15,7 +15,6 @@
 		EF4D1EB221D553ED001D7137 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF4D1EB021D553ED001D7137 /* Metal.framework */; };
 		EF4D1EB321D553ED001D7137 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF4D1EB121D553ED001D7137 /* MetalKit.framework */; };
 		EF4D1EB921D554B5001D7137 /* MXView.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EB821D554B5001D7137 /* MXView.m */; };
-		EF4D1EBD21D57FBA001D7137 /* MXShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EBC21D57FBA001D7137 /* MXShader.metal */; };
 		EF4D1EC121D69A4A001D7137 /* MXTransformationStack.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EC021D69A4A001D7137 /* MXTransformationStack.m */; };
 		EF4D1EC321D71955001D7137 /* teapot.obj in Resources */ = {isa = PBXBuildFile; fileRef = EF4D1EC221D71955001D7137 /* teapot.obj */; };
 		EF4D1ECB21DC18A7001D7137 /* MXShadow.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1ECA21DC18A6001D7137 /* MXShadow.metal */; };
@@ -41,7 +40,6 @@
 		EF4D1EB821D554B5001D7137 /* MXView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MXView.m; sourceTree = "<group>"; };
 		EF4D1EBA21D57286001D7137 /* MXShaderTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXShaderTypes.h; sourceTree = "<group>"; };
 		EF4D1EBB21D57CC9001D7137 /* MXGeometry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXGeometry.h; sourceTree = "<group>"; };
-		EF4D1EBC21D57FBA001D7137 /* MXShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXShader.metal; sourceTree = "<group>"; };
 		EF4D1EBF21D69A4A001D7137 /* MXTransformationStack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MXTransformationStack.h; sourceTree = "<group>"; };
 		EF4D1EC021D69A4A001D7137 /* MXTransformationStack.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MXTransformationStack.m; sourceTree = "<group>"; };
 		EF4D1EC221D71955001D7137 /* teapot.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = teapot.obj; sourceTree = "<group>"; };
@@ -132,7 +130,6 @@
 			children = (
 				EF4D1EBA21D57286001D7137 /* MXShaderTypes.h */,
 				EF4D1EBB21D57CC9001D7137 /* MXGeometry.h */,
-				EF4D1EBC21D57FBA001D7137 /* MXShader.metal */,
 				EF4D1ECA21DC18A6001D7137 /* MXShadow.metal */,
 				EF610B9D21DD9A490068D5FF /* MXFairy.metal */,
 				EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */,
@@ -221,7 +218,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				EF4D1EBD21D57FBA001D7137 /* MXShader.metal in Sources */,
 				EF4D1EA021D5536A001D7137 /* MXViewController.m in Sources */,
 				EF610BA221DEFCAD0068D5FF /* MXGBufferRender.metal in Sources */,
 				EF610BA021DEE8E60068D5FF /* MXGBufferShader.metal in Sources */,
