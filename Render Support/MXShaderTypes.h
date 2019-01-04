@@ -70,6 +70,7 @@ typedef struct MXUniforms
 	matrix_float4x4 model;
 	matrix_float4x4 view;
 	matrix_float4x4 inverse;	// inverse of model
+	matrix_float4x4 vinverse;	// inverse of view
 	matrix_float4x4 shadow;		// matrix for light position/shadow mapping
 } MXUniforms;
 

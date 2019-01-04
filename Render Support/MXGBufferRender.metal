@@ -33,7 +33,6 @@ struct VertexIn {
 struct VertexOut {
 	float4 position 	[[position]];
 	float2 uv;
-	float2 xy;
 };
 
 /****************************************************************************/
@@ -54,7 +53,6 @@ vertex VertexOut vertex_grender(VertexIn v [[stage_in]])
 	VertexOut out;
 
 	out.position = float4(v.position,0,1);
-	out.xy = v.position;
 
 	/*
 	 *	Compute texture x/y. Note we should be invoked without a perspective

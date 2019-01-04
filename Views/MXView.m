@@ -42,6 +42,11 @@
 @property (strong) id<MTLFunction> fairyFragmentFunction;
 @property (strong) id<MTLRenderPipelineState> fairyPipeline;
 
+// Fairy pipeline
+@property (strong) id<MTLFunction> fairyLightVertexFunction;
+@property (strong) id<MTLFunction> fairyLightFragmentFunction;
+@property (strong) id<MTLRenderPipelineState> fairyLightPipeline;
+
 // GBuffer pipeline
 @property (strong) id<MTLFunction> gVertexFunction;
 @property (strong) id<MTLFunction> gFragmentFunction;
@@ -64,6 +69,7 @@
 @property (strong) id<MTLDepthStencilState> fairyDepth;
 @property (strong) id<MTLDepthStencilState> drawStencil;
 @property (strong) id<MTLDepthStencilState> maskStencil;
+@property (strong) id<MTLDepthStencilState> illuminationStencil;
 
 // Textures and support
 @property (strong) id<MTLTexture> texture;
@@ -387,6 +393,22 @@
 	maskStencilDescriptor.frontFaceStencil = maskStencil;
 
 	self.maskStencil = [self.device newDepthStencilStateWithDescriptor:maskStencilDescriptor];
+
+	/*
+	 *	Set up the mask stencil. This causes our renderer to only operate on
+	 *	pixels that have been filled in
+	 */
+
+	MTLDepthStencilDescriptor *illuminationStencilDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+	illuminationStencilDescriptor.depthCompareFunction = MTLCompareFunctionAlways;
+	[illuminationStencilDescriptor setDepthWriteEnabled:NO];
+
+	MTLStencilDescriptor *illuminationStencil = [[MTLStencilDescriptor alloc] init];
+	illuminationStencil.stencilCompareFunction = MTLCompareFunctionEqual;
+	illuminationStencilDescriptor.backFaceStencil = illuminationStencil;
+	illuminationStencilDescriptor.frontFaceStencil = illuminationStencil;
+
+	self.illuminationStencil = [self.device newDepthStencilStateWithDescriptor:illuminationStencilDescriptor];
 }
 
 /*
@@ -418,6 +440,9 @@
 
 	self.fairyVertexFunction = [self.library newFunctionWithName:@"vertex_fairy"];
 	self.fairyFragmentFunction = [self.library newFunctionWithName:@"fragment_fairy"];
+
+	self.fairyLightVertexFunction = [self.library newFunctionWithName:@"vertex_illumination"];
+	self.fairyLightFragmentFunction = [self.library newFunctionWithName:@"fragment_illumination"];
 
 	self.gVertexFunction = [self.library newFunctionWithName:@"vertex_gbuffer"];
 	self.gFragmentFunction = [self.library newFunctionWithName:@"fragment_gbuffer"];
@@ -483,6 +508,28 @@
 	fairyPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
 
 	self.fairyPipeline = [self.device newRenderPipelineStateWithDescriptor:fairyPipelineDescriptor error:nil];
+
+	/*
+	 *	Fairy lights pipeline renderer
+	 */
+
+	MTLRenderPipelineDescriptor *fairyLightPipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	fairyLightPipelineDescriptor.vertexFunction = self.fairyLightVertexFunction;
+	fairyLightPipelineDescriptor.fragmentFunction = self.fairyLightFragmentFunction;
+	fairyLightPipelineDescriptor.vertexDescriptor = fairyDescriptors;
+	fairyLightPipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
+	fairyLightPipelineDescriptor.stencilAttachmentPixelFormat = self.depthStencilPixelFormat;
+	fairyLightPipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+
+	fairyLightPipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
+	fairyLightPipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+	fairyLightPipelineDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+	fairyLightPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+	fairyLightPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+	fairyLightPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+	fairyLightPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+
+	self.fairyLightPipeline = [self.device newRenderPipelineStateWithDescriptor:fairyLightPipelineDescriptor error:nil];
 
 	/*
 	 *	GBuffer pipeline
@@ -606,6 +653,7 @@
 	u.view = self.view.ctm;
 	u.model = self.model.ctm;
 	u.inverse = self.model.inverseCtm;
+	u.vinverse = self.view.inverseCtm;
 
 	/*
 	 *	Populate u.shadow with the transformation which renders our scene from
@@ -703,10 +751,11 @@
 	[encoder setFragmentTexture:self.colorMap atIndex:MXTextureIndexColor];
 	[encoder setFragmentTexture:self.normalMap atIndex:MXTextureIndexNormal];
 	[encoder setFragmentTexture:self.depthStencilTexture atIndex:MXTextureIndexDepth];
+	[encoder setFragmentBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
 
 	/*
-	 *	Render fairy lights
+	 *	Update fairy light positions
 	 */
 
 	for (int i = 0; i < MAX_FAIRYLIGHTS; ++i) {
@@ -723,6 +772,25 @@
 		loc->position[2] = sx * cy * loc->radius;
 		loc->position[1] = sy * loc->radius;
 	}
+
+	/*
+	 *	Render fairy light illumination on the teapot
+	 */
+
+	[encoder setRenderPipelineState:self.fairyLightPipeline];
+	[encoder setDepthStencilState:self.illuminationStencil];
+	[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
+	[encoder setVertexBytes:fairyLights length:sizeof(fairyLights) atIndex:MXVertexIndexLocations];
+	[encoder setFragmentTexture:self.colorMap atIndex:MXTextureIndexColor];
+	[encoder setFragmentTexture:self.normalMap atIndex:MXTextureIndexNormal];
+	[encoder setFragmentTexture:self.depthStencilTexture atIndex:MXTextureIndexDepth];
+	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6 instanceCount:MAX_FAIRYLIGHTS];
+
+	/*
+	 *	Render fairy lights
+	 */
+
 	[encoder setRenderPipelineState:self.fairyPipeline];
 	[encoder setDepthStencilState:self.fairyDepth];
 	[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];

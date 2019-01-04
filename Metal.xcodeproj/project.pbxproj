@@ -21,6 +21,7 @@
 		EF610B9E21DD9A490068D5FF /* MXFairy.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF610B9D21DD9A490068D5FF /* MXFairy.metal */; };
 		EF610BA021DEE8E60068D5FF /* MXGBufferShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */; };
 		EF610BA221DEFCAD0068D5FF /* MXGBufferRender.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF610BA121DEFCAD0068D5FF /* MXGBufferRender.metal */; };
+		EF7715DC21E0058B00F2C47E /* MXFairyIllumination.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF7715DB21E0058B00F2C47E /* MXFairyIllumination.metal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -47,6 +48,7 @@
 		EF610B9D21DD9A490068D5FF /* MXFairy.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXFairy.metal; sourceTree = "<group>"; };
 		EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXGBufferShader.metal; sourceTree = "<group>"; };
 		EF610BA121DEFCAD0068D5FF /* MXGBufferRender.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXGBufferRender.metal; sourceTree = "<group>"; };
+		EF7715DB21E0058B00F2C47E /* MXFairyIllumination.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXFairyIllumination.metal; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -132,6 +134,7 @@
 				EF4D1EBB21D57CC9001D7137 /* MXGeometry.h */,
 				EF4D1ECA21DC18A6001D7137 /* MXShadow.metal */,
 				EF610B9D21DD9A490068D5FF /* MXFairy.metal */,
+				EF7715DB21E0058B00F2C47E /* MXFairyIllumination.metal */,
 				EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */,
 				EF610BA121DEFCAD0068D5FF /* MXGBufferRender.metal */,
 			);
@@ -227,6 +230,7 @@
 				EF4D1E9D21D5536A001D7137 /* AppDelegate.m in Sources */,
 				EF610B9E21DD9A490068D5FF /* MXFairy.metal in Sources */,
 				EF4D1EB921D554B5001D7137 /* MXView.m in Sources */,
+				EF7715DC21E0058B00F2C47E /* MXFairyIllumination.metal in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
