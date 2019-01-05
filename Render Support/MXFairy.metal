@@ -27,23 +27,6 @@ struct VertexIn {
     float2 position		[[attribute(MXAttributeIndexPosition)]];
 };
 
-/*	FairyLightIn
- *
- *		Location and positions of the fairy lights. (This contains additional
- *	information not used in this renderer.) Because we can this through an
- *	array of these objects we don't need to declare their attributes.
- */
-
-struct FairyLightIn {
-	float3 position;
-	float3 color;
-	float size;
-
-	float2 angle;
-	float speed;
-	float radius;
-};
-
 struct VertexOut
 {
 	float4 position [[position]];
@@ -66,7 +49,7 @@ struct VertexOut
 
 vertex VertexOut vertex_fairy(VertexIn v [[stage_in]],
 							  constant MXUniforms &u [[buffer(MXVertexIndexUniforms)]],
-							  constant FairyLightIn *positions [[buffer(MXVertexIndexLocations)]],
+							  constant MXFairyLocation *positions [[buffer(MXVertexIndexLocations)]],
 							  uint iid [[instance_id]])
 {
 	VertexOut out;

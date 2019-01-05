@@ -57,6 +57,11 @@
 @property (strong) id<MTLFunction> grFragmentFunction;
 @property (strong) id<MTLRenderPipelineState> grPipeline;
 
+// Compute pipeline
+@property (strong) id<MTLComputePipelineState> fkPipeline;
+@property (strong) id<MTLFunction> fkFunction;
+@property (strong) id<MTLBuffer> fkBuffer;
+
 // Shadow map (2D texture of floats)
 @property (strong) id<MTLTexture> shadowMap;
 
@@ -139,6 +144,7 @@
 	[self setupTextures];
 	[self setupFairyVertex];
 	[self setupFairyLights];
+	[self setupComputePipeline];
 
 	// Kludge to make sure our size is drawin in the proper order
 	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -265,6 +271,8 @@
 
 		l->size = 5;
 	}
+
+	self.fkBuffer = [self.device newBufferWithBytes:fairyLights length:sizeof(fairyLights) options:MTLResourceOptionCPUCacheModeDefault];
 }
 
 /****************************************************************************/
@@ -313,6 +321,13 @@
 	 */
 
 	self.device = MTLCreateSystemDefaultDevice();
+
+	/*
+	 *	Get our library. This is the library of GPU methods that have
+	 *	been precompiled by Xcode
+	 */
+
+	self.library = [self.device newDefaultLibrary];
 
 	/*
 	 *	Set certain parameters for our view's behavior, color depth, background
@@ -412,6 +427,25 @@
 }
 
 /*
+ *	Set up our compute pipeline.
+ */
+
+- (void)setupComputePipeline
+{
+	/*
+	 *	Get the kernel function from our library
+	 */
+
+	self.fkFunction = [self.library newFunctionWithName:@"fairy_kernel"];
+
+	/*
+	 *	Generate the compute pipeline state
+	 */
+
+	self.fkPipeline = [self.device newComputePipelineStateWithFunction:self.fkFunction error:nil];
+}
+
+/*
  *	This sets up our pipeline state. The pipeline state stores information
  *	such as the vertex and fragment shader functions on the GPU, and the
  *	attributes used to populate our contents so we can map the contents of
@@ -423,15 +457,9 @@
 
 - (void)setupPipeline
 {
-	/*
-	 *	Step 1: Get our library. This is the library of GPU methods that have
-	 *	been precompiled by Xcode
-	 */
-
-	self.library = [self.device newDefaultLibrary];
 
 	/*
-	 *	Step 2: Get our vertex and fragment functions. These should be the
+	 *	Get our vertex and fragment functions. These should be the
 	 *	same names as the functions declared in our MXShader file.
 	 */
 
@@ -451,7 +479,7 @@
 	self.grFragmentFunction = [self.library newFunctionWithName:@"fragment_grender"];
 
 	/*
-	 *	Step 3: Construct our vertex descriptor. We do this to map the
+	 *	Construct our vertex descriptor. We do this to map the
 	 *	offsets in our trangle buffer to the attrite offsets sent to our
 	 *	GPU. Because we're not using the Model I/O API to load a model, we
 	 *	build the MTLVertexDescriptor directly.
@@ -628,6 +656,7 @@
 {
 	MTLRenderPassDescriptor *descriptor;
 	id<MTLRenderCommandEncoder> encoder;
+	id<MTLComputeCommandEncoder> compute;
 
 	/*
 	 *	Test to see if we've constructed our G Buffer. If we haven't we
@@ -657,6 +686,7 @@
 	u.model = self.model.ctm;
 	u.inverse = self.model.inverseCtm;
 	u.vinverse = self.view.inverseCtm;
+	u.elapsed = elapsed;
 
 	/*
 	 *	Populate u.shadow with the transformation which renders our scene from
@@ -685,6 +715,22 @@
 	 */
 
 	id<MTLCommandBuffer> buffer = [self.commandQueue commandBuffer];
+
+	/*
+	 *	Create the compute pass to update the fairy locations in our compute
+	 *	buffer
+	 */
+
+	compute = [buffer computeCommandEncoder];
+
+	[compute setBuffer:self.fkBuffer offset:0 atIndex:MXVertexIndexLocations];
+	[compute setBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
+	[compute setComputePipelineState:self.fkPipeline];
+
+	MTLSize threadGroupSize = MTLSizeMake(1, 1, 1);
+	MTLSize threadsPerGroup = MTLSizeMake(MAX_FAIRYLIGHTS, 1, 1);
+	[compute dispatchThreads:threadsPerGroup threadsPerThreadgroup:threadGroupSize];
+	[compute endEncoding];
 
 	/*
 	 *	Create the render pass for our first pass for rendering the shadow mask
@@ -784,7 +830,8 @@
 	[encoder setDepthStencilState:self.illuminationStencil];
 	[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
-	[encoder setVertexBytes:fairyLights length:sizeof(fairyLights) atIndex:MXVertexIndexLocations];
+	[encoder setVertexBuffer:self.fkBuffer offset:0 atIndex:MXVertexIndexLocations];
+//	[encoder setVertexBytes:fairyLights length:sizeof(fairyLights) atIndex:MXVertexIndexLocations];
 	[encoder setFragmentTexture:self.colorMap atIndex:MXTextureIndexColor];
 	[encoder setFragmentTexture:self.normalMap atIndex:MXTextureIndexNormal];
 	[encoder setFragmentTexture:self.depthStencilTexture atIndex:MXTextureIndexDepth];
@@ -798,7 +845,8 @@
 	[encoder setDepthStencilState:self.fairyDepth];
 	[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
-	[encoder setVertexBytes:fairyLights length:sizeof(fairyLights) atIndex:MXVertexIndexLocations];
+	[encoder setVertexBuffer:self.fkBuffer offset:0 atIndex:MXVertexIndexLocations];
+//	[encoder setVertexBytes:fairyLights length:sizeof(fairyLights) atIndex:MXVertexIndexLocations];
 	[encoder setFragmentTexture:self.fairyTexture atIndex:MXTextureIndex0];
 	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6 instanceCount:MAX_FAIRYLIGHTS];
 

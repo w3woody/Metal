@@ -58,21 +58,5 @@ typedef struct MXFairyVertex
 	vector_float2 position;
 } MXFairyVertex;
 
-/*	MXFairyLocation
- *
- *		The structure giving the position of our lights
- */
-
-typedef struct MXFairyLocation
-{
-	vector_float3 position;
-	vector_float3 color;
-	float size;
-
-	vector_float2 angle;
-	float speed;
-	float radius;
-} MXFairyLocation;
-
 
 #endif /* MXGeometry_h */

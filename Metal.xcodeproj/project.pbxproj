@@ -22,6 +22,7 @@
 		EF610BA021DEE8E60068D5FF /* MXGBufferShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */; };
 		EF610BA221DEFCAD0068D5FF /* MXGBufferRender.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF610BA121DEFCAD0068D5FF /* MXGBufferRender.metal */; };
 		EF7715DC21E0058B00F2C47E /* MXFairyIllumination.metal in Sources */ = {isa = PBXBuildFile; fileRef = EF7715DB21E0058B00F2C47E /* MXFairyIllumination.metal */; };
+		EFB457E321E1300100AEA8DC /* MXFairyKernel.metal in Sources */ = {isa = PBXBuildFile; fileRef = EFB457E221E1300100AEA8DC /* MXFairyKernel.metal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,6 +50,7 @@
 		EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXGBufferShader.metal; sourceTree = "<group>"; };
 		EF610BA121DEFCAD0068D5FF /* MXGBufferRender.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXGBufferRender.metal; sourceTree = "<group>"; };
 		EF7715DB21E0058B00F2C47E /* MXFairyIllumination.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXFairyIllumination.metal; sourceTree = "<group>"; };
+		EFB457E221E1300100AEA8DC /* MXFairyKernel.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXFairyKernel.metal; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -137,6 +139,7 @@
 				EF7715DB21E0058B00F2C47E /* MXFairyIllumination.metal */,
 				EF610B9F21DEE8E60068D5FF /* MXGBufferShader.metal */,
 				EF610BA121DEFCAD0068D5FF /* MXGBufferRender.metal */,
+				EFB457E221E1300100AEA8DC /* MXFairyKernel.metal */,
 			);
 			path = "Render Support";
 			sourceTree = "<group>";
@@ -224,6 +227,7 @@
 				EF4D1EA021D5536A001D7137 /* MXViewController.m in Sources */,
 				EF610BA221DEFCAD0068D5FF /* MXGBufferRender.metal in Sources */,
 				EF610BA021DEE8E60068D5FF /* MXGBufferShader.metal in Sources */,
+				EFB457E321E1300100AEA8DC /* MXFairyKernel.metal in Sources */,
 				EF4D1ECB21DC18A7001D7137 /* MXShadow.metal in Sources */,
 				EF4D1EA821D5536A001D7137 /* main.m in Sources */,
 				EF4D1EC121D69A4A001D7137 /* MXTransformationStack.m in Sources */,

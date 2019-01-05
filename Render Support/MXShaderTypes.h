@@ -68,11 +68,29 @@ typedef enum MXColorIndex
 typedef struct MXUniforms
 {
 	float aspect;
+	float elapsed;
 	matrix_float4x4 model;
 	matrix_float4x4 view;
 	matrix_float4x4 inverse;	// inverse of model
 	matrix_float4x4 vinverse;	// inverse of view
 	matrix_float4x4 shadow;		// matrix for light position/shadow mapping
 } MXUniforms;
+
+/*	MXFairyLocation
+ *
+ *		The structure giving the position of our lights
+ */
+
+typedef struct MXFairyLocation
+{
+	vector_float3 position;
+	vector_float3 color;
+	float size;
+
+	vector_float2 angle;
+	float speed;
+	float radius;
+} MXFairyLocation;
+
 
 #endif /* MXShaderTypes_h */
