@@ -602,7 +602,10 @@
 	[self.model rotateAroundAxis:(vector_float3){ 0, 1, 0 } byAngle:elapsed];
 	[self.model scaleBy:2];
 
+	CGSize size = self.bounds.size;
+
 	MXUniforms u;
+	u.aspect = size.width/size.height;
 	u.view = self.view.ctm;
 	u.model = self.model.ctm;
 	u.inverse = self.model.inverseCtm;
