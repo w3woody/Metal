@@ -54,6 +54,7 @@ typedef enum MXTextureIndex
 
 typedef struct MXUniforms
 {
+	float aspect;
 	matrix_float4x4 model;
 	matrix_float4x4 view;
 	matrix_float4x4 inverse;	// inverse of model
