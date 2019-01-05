@@ -74,7 +74,9 @@ vertex VertexOut vertex_fairy(VertexIn v [[stage_in]],
 	// Transform location and offset
 	float4 screenPos = u.view * u.model * float4(positions[iid].position,1.0);
 	// Offset the X/Y location
-	screenPos.xy += v.position * 0.03 * positions[iid].size / screenPos.w;
+	float2 delta = v.position * 0.03 * positions[iid].size / screenPos.w;
+	delta.x /= u.aspect;
+	screenPos.xy += delta;
 	out.position = screenPos;
 
 	// Pass through UV/color
