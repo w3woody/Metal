@@ -79,7 +79,9 @@ vertex VertexOut vertex_illumination(VertexIn v [[stage_in]],
 	float4 screenPos = u.view * worldPos;
 	// Offset the X/Y location. Note this is 5 times bigger than with
 	// the fairy light shaders.
-	screenPos.xy += v.position * 0.15 * positions[iid].size;
+	float2 delta = v.position * 0.15 * positions[iid].size;
+	delta.x /= u.aspect;
+	screenPos.xy += delta;
 	out.position = screenPos;
 
 	float2 screenXY = screenPos.xy / screenPos.w;
