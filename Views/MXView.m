@@ -831,7 +831,6 @@
 	[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 	[encoder setVertexBuffer:self.fkBuffer offset:0 atIndex:MXVertexIndexLocations];
-//	[encoder setVertexBytes:fairyLights length:sizeof(fairyLights) atIndex:MXVertexIndexLocations];
 	[encoder setFragmentTexture:self.colorMap atIndex:MXTextureIndexColor];
 	[encoder setFragmentTexture:self.normalMap atIndex:MXTextureIndexNormal];
 	[encoder setFragmentTexture:self.depthStencilTexture atIndex:MXTextureIndexDepth];
@@ -846,7 +845,6 @@
 	[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 	[encoder setVertexBuffer:self.fkBuffer offset:0 atIndex:MXVertexIndexLocations];
-//	[encoder setVertexBytes:fairyLights length:sizeof(fairyLights) atIndex:MXVertexIndexLocations];
 	[encoder setFragmentTexture:self.fairyTexture atIndex:MXTextureIndex0];
 	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6 instanceCount:MAX_FAIRYLIGHTS];
 
