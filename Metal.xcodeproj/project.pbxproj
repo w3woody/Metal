@@ -15,6 +15,8 @@
 		EF4D1EB221D553ED001D7137 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF4D1EB021D553ED001D7137 /* Metal.framework */; };
 		EF4D1EB321D553ED001D7137 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF4D1EB121D553ED001D7137 /* MetalKit.framework */; };
 		EF4D1EB921D554B5001D7137 /* MXView.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EB821D554B5001D7137 /* MXView.m */; };
+		EFB457E721E278D300AEA8DC /* MXShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = EFB457E621E278D300AEA8DC /* MXShader.metal */; };
+		EFB457EA21E2799000AEA8DC /* MXPrimitiveObject.m in Sources */ = {isa = PBXBuildFile; fileRef = EFB457E921E2799000AEA8DC /* MXPrimitiveObject.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +34,9 @@
 		EF4D1EB121D553ED001D7137 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		EF4D1EB721D554B5001D7137 /* MXView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXView.h; sourceTree = "<group>"; };
 		EF4D1EB821D554B5001D7137 /* MXView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MXView.m; sourceTree = "<group>"; };
+		EFB457E621E278D300AEA8DC /* MXShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXShader.metal; sourceTree = "<group>"; };
+		EFB457E821E2799000AEA8DC /* MXPrimitiveObject.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXPrimitiveObject.h; sourceTree = "<group>"; };
+		EFB457E921E2799000AEA8DC /* MXPrimitiveObject.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MXPrimitiveObject.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -50,7 +55,8 @@
 		EF4D1E8F21D5536A001D7137 = {
 			isa = PBXGroup;
 			children = (
-				EF4D1EB621D5541C001D7137 /* Render Support */,
+				EFB457E421E2788B00AEA8DC /* Render Primitives */,
+				EFB457E521E278C100AEA8DC /* Render Support */,
 				EF4D1EB521D55410001D7137 /* View Controllers */,
 				EF4D1EB421D55407001D7137 /* Views */,
 				EF4D1E9A21D5536A001D7137 /* Metal */,
@@ -108,9 +114,19 @@
 			path = "View Controllers";
 			sourceTree = "<group>";
 		};
-		EF4D1EB621D5541C001D7137 /* Render Support */ = {
+		EFB457E421E2788B00AEA8DC /* Render Primitives */ = {
 			isa = PBXGroup;
 			children = (
+				EFB457E821E2799000AEA8DC /* MXPrimitiveObject.h */,
+				EFB457E921E2799000AEA8DC /* MXPrimitiveObject.m */,
+			);
+			path = "Render Primitives";
+			sourceTree = "<group>";
+		};
+		EFB457E521E278C100AEA8DC /* Render Support */ = {
+			isa = PBXGroup;
+			children = (
+				EFB457E621E278D300AEA8DC /* MXShader.metal */,
 			);
 			path = "Render Support";
 			sourceTree = "<group>";
@@ -185,8 +201,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EFB457E721E278D300AEA8DC /* MXShader.metal in Sources */,
 				EF4D1EA021D5536A001D7137 /* MXViewController.m in Sources */,
 				EF4D1EA821D5536A001D7137 /* main.m in Sources */,
+				EFB457EA21E2799000AEA8DC /* MXPrimitiveObject.m in Sources */,
 				EF4D1E9D21D5536A001D7137 /* AppDelegate.m in Sources */,
 				EF4D1EB921D554B5001D7137 /* MXView.m in Sources */,
 			);
