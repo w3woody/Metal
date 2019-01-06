@@ -16,7 +16,10 @@
 		EF4D1EB321D553ED001D7137 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF4D1EB121D553ED001D7137 /* MetalKit.framework */; };
 		EF4D1EB921D554B5001D7137 /* MXView.m in Sources */ = {isa = PBXBuildFile; fileRef = EF4D1EB821D554B5001D7137 /* MXView.m */; };
 		EFB457E721E278D300AEA8DC /* MXShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = EFB457E621E278D300AEA8DC /* MXShader.metal */; };
-		EFB457EA21E2799000AEA8DC /* MXPrimitiveObject.m in Sources */ = {isa = PBXBuildFile; fileRef = EFB457E921E2799000AEA8DC /* MXPrimitiveObject.m */; };
+		EFB457EE21E2A08700AEA8DC /* MXTransformationStack.m in Sources */ = {isa = PBXBuildFile; fileRef = EFB457EC21E2A08700AEA8DC /* MXTransformationStack.m */; };
+		EFB457F621E2A0F400AEA8DC /* Sphere.stl in Resources */ = {isa = PBXBuildFile; fileRef = EFB457F321E2A0F300AEA8DC /* Sphere.stl */; };
+		EFB457F721E2A0F400AEA8DC /* Cube.stl in Resources */ = {isa = PBXBuildFile; fileRef = EFB457F421E2A0F300AEA8DC /* Cube.stl */; };
+		EFB457F821E2A0F400AEA8DC /* Cylinders.stl in Resources */ = {isa = PBXBuildFile; fileRef = EFB457F521E2A0F400AEA8DC /* Cylinders.stl */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,8 +38,13 @@
 		EF4D1EB721D554B5001D7137 /* MXView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXView.h; sourceTree = "<group>"; };
 		EF4D1EB821D554B5001D7137 /* MXView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MXView.m; sourceTree = "<group>"; };
 		EFB457E621E278D300AEA8DC /* MXShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MXShader.metal; sourceTree = "<group>"; };
-		EFB457E821E2799000AEA8DC /* MXPrimitiveObject.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MXPrimitiveObject.h; sourceTree = "<group>"; };
-		EFB457E921E2799000AEA8DC /* MXPrimitiveObject.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MXPrimitiveObject.m; sourceTree = "<group>"; };
+		EFB457EC21E2A08700AEA8DC /* MXTransformationStack.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MXTransformationStack.m; sourceTree = "<group>"; };
+		EFB457ED21E2A08700AEA8DC /* MXTransformationStack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MXTransformationStack.h; sourceTree = "<group>"; };
+		EFB457EF21E2A09A00AEA8DC /* MXShaderTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MXShaderTypes.h; sourceTree = "<group>"; };
+		EFB457F021E2A09A00AEA8DC /* MXGeometry.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MXGeometry.h; sourceTree = "<group>"; };
+		EFB457F321E2A0F300AEA8DC /* Sphere.stl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Sphere.stl; sourceTree = "<group>"; };
+		EFB457F421E2A0F300AEA8DC /* Cube.stl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Cube.stl; sourceTree = "<group>"; };
+		EFB457F521E2A0F400AEA8DC /* Cylinders.stl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Cylinders.stl; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,7 +63,7 @@
 		EF4D1E8F21D5536A001D7137 = {
 			isa = PBXGroup;
 			children = (
-				EFB457E421E2788B00AEA8DC /* Render Primitives */,
+				EFB457EB21E2A07A00AEA8DC /* 3D Transformations */,
 				EFB457E521E278C100AEA8DC /* Render Support */,
 				EF4D1EB521D55410001D7137 /* View Controllers */,
 				EF4D1EB421D55407001D7137 /* Views */,
@@ -83,6 +91,9 @@
 				EF4D1EA621D5536A001D7137 /* Info.plist */,
 				EF4D1EA721D5536A001D7137 /* main.m */,
 				EF4D1EA921D5536A001D7137 /* Metal.entitlements */,
+				EFB457F421E2A0F300AEA8DC /* Cube.stl */,
+				EFB457F521E2A0F400AEA8DC /* Cylinders.stl */,
+				EFB457F321E2A0F300AEA8DC /* Sphere.stl */,
 			);
 			path = Metal;
 			sourceTree = "<group>";
@@ -114,21 +125,23 @@
 			path = "View Controllers";
 			sourceTree = "<group>";
 		};
-		EFB457E421E2788B00AEA8DC /* Render Primitives */ = {
-			isa = PBXGroup;
-			children = (
-				EFB457E821E2799000AEA8DC /* MXPrimitiveObject.h */,
-				EFB457E921E2799000AEA8DC /* MXPrimitiveObject.m */,
-			);
-			path = "Render Primitives";
-			sourceTree = "<group>";
-		};
 		EFB457E521E278C100AEA8DC /* Render Support */ = {
 			isa = PBXGroup;
 			children = (
+				EFB457F021E2A09A00AEA8DC /* MXGeometry.h */,
+				EFB457EF21E2A09A00AEA8DC /* MXShaderTypes.h */,
 				EFB457E621E278D300AEA8DC /* MXShader.metal */,
 			);
 			path = "Render Support";
+			sourceTree = "<group>";
+		};
+		EFB457EB21E2A07A00AEA8DC /* 3D Transformations */ = {
+			isa = PBXGroup;
+			children = (
+				EFB457ED21E2A08700AEA8DC /* MXTransformationStack.h */,
+				EFB457EC21E2A08700AEA8DC /* MXTransformationStack.m */,
+			);
+			path = "3D Transformations";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -189,8 +202,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EFB457F821E2A0F400AEA8DC /* Cylinders.stl in Resources */,
+				EFB457F721E2A0F400AEA8DC /* Cube.stl in Resources */,
 				EF4D1EA221D5536A001D7137 /* Assets.xcassets in Resources */,
 				EF4D1EA521D5536A001D7137 /* Main.storyboard in Resources */,
+				EFB457F621E2A0F400AEA8DC /* Sphere.stl in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -204,8 +220,8 @@
 				EFB457E721E278D300AEA8DC /* MXShader.metal in Sources */,
 				EF4D1EA021D5536A001D7137 /* MXViewController.m in Sources */,
 				EF4D1EA821D5536A001D7137 /* main.m in Sources */,
-				EFB457EA21E2799000AEA8DC /* MXPrimitiveObject.m in Sources */,
 				EF4D1E9D21D5536A001D7137 /* AppDelegate.m in Sources */,
+				EFB457EE21E2A08700AEA8DC /* MXTransformationStack.m in Sources */,
 				EF4D1EB921D554B5001D7137 /* MXView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

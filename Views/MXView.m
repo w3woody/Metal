@@ -7,11 +7,36 @@
 //
 
 #import "MXView.h"
+#import "MXShaderTypes.h"
+#import "MXGeometry.h"
+#import "MXTransformationStack.h"
 
 @interface MXView () <MTKViewDelegate>
 
 // Command queue
 @property (strong) id<MTLCommandQueue> commandQueue;
+
+// The teapot, as a collection of meshes
+@property (strong) NSArray<MTKMesh *> *cube;
+@property (strong) NSArray<MTKMesh *> *cylinders;
+@property (strong) NSArray<MTKMesh *> *sphere;
+
+// Pipeline state stuff
+@property (strong) id<MTLLibrary> library;
+@property (strong) id<MTLFunction> vertexFunction;
+@property (strong) id<MTLFunction> fragmentFunction;
+@property (strong) id<MTLRenderPipelineState> pipeline;
+
+// Depth stencil
+@property (strong) id<MTLDepthStencilState> depth;
+
+// Transformation matrices
+@property (strong) MXTransformationStack *view;
+@property (strong) MXTransformationStack *model;
+
+// Starting time
+@property (assign) double startTime;
+
 @end
 
 @implementation MXView
@@ -53,6 +78,42 @@
 	self.delegate = self;
 
 	/*
+	 *	Note the start time
+	 */
+
+	self.startTime = CACurrentMediaTime();
+
+	/*
+	 *	Application startup
+	 */
+
+	[self setupView];
+	[self setupPipeline];
+	[self setupTransformation];
+	[self setupDepthStencilState];
+
+	// Kludge to make sure our size is drawin in the proper order
+	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+		[self mtkView:self drawableSizeWillChange:self.bounds.size];
+	});
+}
+
+
+/****************************************************************************/
+/*																			*/
+/*	Initialization Methods													*/
+/*																			*/
+/****************************************************************************/
+#pragma mark - Initialization Methods
+
+/*
+ *	Routines which perform basic initialization: getting the device, setting
+ *	screen parameters, and creating the command queue
+ */
+
+- (void)setupView
+{
+	/*
 	 *	Get the device for this view. (For a real MacOS application, this
 	 *	should be replaced with a more sophisticated system that determines
 	 *	the appropriate device depending on which screen this view is located,
@@ -69,12 +130,13 @@
 
 	self.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
 	self.clearColor = MTLClearColorMake(0.1, 0.1, 0.2, 1.0);
+	self.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
 
 	// The following two calls essentially change the behavior of our view
 	// so that it only updates on setNeedsDisplay. This behavior is useful
 	// if you are creating a 3D CAD system instead of a game.
-	self.paused = YES;
-	self.enableSetNeedsDisplay = YES;
+//	self.paused = YES;
+//	self.enableSetNeedsDisplay = YES;
 
 	/*
 	 *	Get the command queue for this device.
@@ -83,6 +145,135 @@
 	self.commandQueue = [self.device newCommandQueue];
 }
 
+- (void)setupDepthStencilState
+{
+	/*
+	 *	Set up the depth stencil
+	 */
+
+	MTLDepthStencilDescriptor *depthDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+	depthDescriptor.depthCompareFunction = MTLCompareFunctionLess;
+	[depthDescriptor setDepthWriteEnabled:YES];
+
+	self.depth = [self.device newDepthStencilStateWithDescriptor:depthDescriptor];
+}
+
+/*
+ *	This sets up our pipeline state. The pipeline state stores information
+ *	such as the vertex and fragment shader functions on the GPU, and the
+ *	attributes used to populate our contents so we can map the contents of
+ *	our buffer (created in setupGeometry above) to the attributes passed to
+ *	our GPU.
+ *
+ *	Note the pipeline state is pretty heavy-weight so we do this once here.
+ */
+
+- (void)setupPipeline
+{
+	/*
+	 *	Step 1: Get our library. This is the library of GPU methods that have
+	 *	been precompiled by Xcode
+	 */
+
+	self.library = [self.device newDefaultLibrary];
+
+	/*
+	 *	Step 2: Get our vertex and fragment functions. These should be the
+	 *	same names as the functions declared in our MXShader file.
+	 */
+
+	self.vertexFunction = [self.library newFunctionWithName:@"vertex_main"];
+	self.fragmentFunction = [self.library newFunctionWithName:@"fragment_main"];
+
+	/*
+	 *	Step 3: Construct our vertex descriptor. We do this to map the
+	 *	offsets in our trangle buffer to the attrite offsets sent to our
+	 *	GPU. Because we're not using the Model I/O API to load a model, we
+	 *	build the MTLVertexDescriptor directly.
+	 *
+	 *	If we were using the Model I/O API to load a model from a resource,
+	 *	we'd create the MDLVertexDescriptor (which are more or less the same
+	 *	thing except not in GPU memory) and use the funnction call
+	 *	MTKMetalVertexDescriptorFromModelIO to convert.
+	 */
+
+	MDLVertexDescriptor *d = [[MDLVertexDescriptor alloc] init];
+	d.attributes[0] = [[MDLVertexAttribute alloc] initWithName:MDLVertexAttributePosition format:MDLVertexFormatFloat3 offset:0 bufferIndex:0];
+	d.attributes[1] = [[MDLVertexAttribute alloc] initWithName:MDLVertexAttributeNormal format:MDLVertexFormatFloat3 offset:sizeof(vector_float3) bufferIndex:0];
+	d.attributes[2] = [[MDLVertexAttribute alloc] initWithName:MDLVertexAttributeTextureCoordinate format:MDLVertexFormatFloat2 offset:sizeof(vector_float3) * 2 bufferIndex:0];
+	d.layouts[0] = [[MDLVertexBufferLayout alloc] initWithStride:sizeof(MXVertex)];
+
+
+	/*
+	 *	Step 4: Start building the pipeline descriptor. This is used to
+	 *	eventually build our pipeline state. Note if we were doing anything
+	 *	more complicated with our pipeline (such as using stencils or depth
+	 *	detection for 3D rendering) we'd set that stuff here.
+	 */
+
+	MTLRenderPipelineDescriptor *pipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	pipelineDescriptor.vertexFunction = self.vertexFunction;
+	pipelineDescriptor.fragmentFunction = self.fragmentFunction;
+	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
+	pipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
+
+	/*
+	 *	Build our pipeline state object.
+	 */
+
+	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+
+	/*
+	 *	Use the vertex descriptor to load our model.
+	 */
+
+	NSURL *modelURL;
+	MDLAsset *asset;
+	MTKMeshBufferAllocator *allocator = [[MTKMeshBufferAllocator alloc] initWithDevice:self.device];
+
+	modelURL = [[NSBundle mainBundle] URLForResource:@"Cube" withExtension:@"stl"];
+	asset = [[MDLAsset alloc] initWithURL:modelURL vertexDescriptor:d bufferAllocator:allocator];
+	self.cube = [MTKMesh newMeshesFromAsset:asset device:self.device sourceMeshes:nil error:nil];
+
+	modelURL = [[NSBundle mainBundle] URLForResource:@"Sphere" withExtension:@"stl"];
+	asset = [[MDLAsset alloc] initWithURL:modelURL vertexDescriptor:d bufferAllocator:allocator];
+	self.sphere = [MTKMesh newMeshesFromAsset:asset device:self.device sourceMeshes:nil error:nil];
+
+	modelURL = [[NSBundle mainBundle] URLForResource:@"Cylinders" withExtension:@"stl"];
+	asset = [[MDLAsset alloc] initWithURL:modelURL vertexDescriptor:d bufferAllocator:allocator];
+	self.cylinders = [MTKMesh newMeshesFromAsset:asset device:self.device sourceMeshes:nil error:nil];
+}
+
+/*
+ *	Setup transformation
+ */
+
+- (void)setupTransformation
+{
+	self.view = [[MXTransformationStack alloc] init];
+	self.model = [[MXTransformationStack alloc] init];
+}
+
+/****************************************************************************/
+/*																			*/
+/*	Drawing Support															*/
+/*																			*/
+/****************************************************************************/
+#pragma mark - Drawing Support
+
+- (void)renderMesh:(NSArray<MTKMesh *> *)meshArray inEncoder:(id<MTLRenderCommandEncoder>)encoder
+{
+    for (MTKMesh *mesh in meshArray) {
+        MTKMeshBuffer *vertexBuffer = [[mesh vertexBuffers] firstObject];
+        [encoder setVertexBuffer:vertexBuffer.buffer offset:vertexBuffer.offset atIndex:0];
+
+        for (MTKSubmesh *submesh in mesh.submeshes) {
+            MTKMeshBuffer *indexBuffer = submesh.indexBuffer;
+            [encoder drawIndexedPrimitives:submesh.primitiveType indexCount:submesh.indexCount indexType:submesh.indexType indexBuffer:indexBuffer.buffer indexBufferOffset:indexBuffer.offset];
+        }
+    }
+}
 
 /****************************************************************************/
 /*																			*/
@@ -93,6 +284,8 @@
 
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size
 {
+	[self.view clear];
+	[self.view perspective:M_PI/3 aspect:size.width/size.height near:0.1 far:1000];
 }
 
 - (void)drawInMTKView:(MTKView *)view
@@ -115,6 +308,58 @@
 	 */
 
 	id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
+	/*
+	 *	Set up our encoder by indicating the pipeline we will be using for
+	 *	rendering our triangle.
+	 */
+
+	[encoder setRenderPipelineState:self.pipeline];
+
+	/*
+	 *	Update the model transformation
+	 */
+
+	double elapsed = CACurrentMediaTime() - self.startTime;
+	[self.model clear];
+	[self.model translateByX:0 y:0 z:-2];
+	[self.model rotateAroundFixedAxis:MTXXAxis byAngle:0.4];
+	[self.model rotateAroundAxis:(vector_float3){ 0, 1, 0 } byAngle:elapsed];
+
+	MXUniforms u;
+	u.view = self.view.ctm;
+	u.model = self.model.ctm;
+	u.inverse = self.model.inverseCtm;
+	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
+
+	/*
+	 *	Enable back-face culling
+	 */
+
+	[encoder setCullMode:MTLCullModeFront];
+
+	/*
+	 *	Set the depth stencil
+	 */
+
+	[encoder setDepthStencilState:self.depth];
+
+	/*
+	 *	Now tell our encoder about where our vertex information is located,
+	 *	and ask it to render our triangle.
+	 */
+
+	vector_float3 color = { 1, 0.5, 0.3 };
+	[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
+	[self renderMesh:self.cube inEncoder:encoder];
+
+	color = (vector_float3){ 0.3, 1.0, 0.3 };
+	[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
+	[self renderMesh:self.sphere inEncoder:encoder];
+
+	color = (vector_float3){ 0.3, 0.5, 1.0 };
+	[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
+	[self renderMesh:self.cylinders inEncoder:encoder];
 
 	/*
 	 *	Commit the encoder, which finishes drawing for this rendering pass
