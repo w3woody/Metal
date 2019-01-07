@@ -2,7 +2,7 @@
 
 The Example 2 branch of the Metal project shows the steps for rendering a simple triangle--including creating the shader functions and passing geometry to the GPU.
 
-When compiled and run you should see a blank screen filled in by the GPU:
+When compiled and run you should see a simple triangle:
 
 ![Screen Shot 2](Images/ScreenShot.png)
 
