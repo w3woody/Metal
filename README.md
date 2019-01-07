@@ -1,3 +1,15 @@
+# Example 9
+
+The Example 9 branch of the Metal project shows including fairy lights. Fairy lights show how we can use the vertex shader to do more than just converting points in 3D, but can be used to generate mixed 2D-3D effects in the same scene.
+
+When compiled and run you should see a rotating green textured teapot surrounded by fairy lights:
+
+![Screen Shot 9](Images/ScreenShot.png)
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
