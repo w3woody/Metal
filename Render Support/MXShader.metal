@@ -117,3 +117,23 @@ fragment float4 fragment_main(VertexOut v [[stage_in]],
 
 	return ambient + diffuse + specular;
 }
+
+
+/****************************************************************************/
+/*																			*/
+/*	Layer Count Kernel														*/
+/*																			*/
+/****************************************************************************/
+
+/*	layer_count
+ *
+ *		Layer count
+ */
+
+kernel void layer_count(texture2d<ushort, access::read> stencil [[texture(0)]],
+						uint2 ix [[thread_position_in_grid]],
+						device MXLayerCount &c [[buffer(1)]])
+{
+	ushort val = stencil.read(ix).x;
+	if (c.count < val) c.count = val;
+}

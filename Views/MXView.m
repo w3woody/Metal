@@ -30,6 +30,14 @@
 // Depth stencil
 @property (strong) id<MTLDepthStencilState> depth;
 
+// Layer counting resources
+@property (strong) id<MTLRenderPipelineState> layerCountPipeline;
+@property (strong) id<MTLDepthStencilState> layerCountDepth;
+@property (strong) id<MTLTexture> layerCountStencil;
+
+@property (strong) id<MTLFunction> layerCountFunction;
+@property (strong) id<MTLComputePipelineState> countPipeline;
+
 // Transformation matrices
 @property (strong) MXTransformationStack *view;
 @property (strong) MXTransformationStack *model;
@@ -78,6 +86,13 @@
 	self.delegate = self;
 
 	/*
+	 *	Grab the device and library
+	 */
+
+	self.device = MTLCreateSystemDefaultDevice();
+	self.library = [self.device newDefaultLibrary];
+
+	/*
 	 *	Note the start time
 	 */
 
@@ -91,6 +106,8 @@
 	[self setupPipeline];
 	[self setupTransformation];
 	[self setupDepthStencilState];
+
+
 
 	// Kludge to make sure our size is drawin in the proper order
 	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -113,16 +130,6 @@
 
 - (void)setupView
 {
-	/*
-	 *	Get the device for this view. (For a real MacOS application, this
-	 *	should be replaced with a more sophisticated system that determines
-	 *	the appropriate device depending on which screen this view is located,
-	 *	and which updates the device and device parameters as needed if the
-	 *	view is moved across screens.)
-	 */
-
-	self.device = MTLCreateSystemDefaultDevice();
-
 	/*
 	 *	Set certain parameters for our view's behavior, color depth, background
 	 *	color and the like.
@@ -151,11 +158,24 @@
 	 *	Set up the depth stencil
 	 */
 
-	MTLDepthStencilDescriptor *depthDescriptor = [[MTLDepthStencilDescriptor alloc] init];
-	depthDescriptor.depthCompareFunction = MTLCompareFunctionLess;
-	[depthDescriptor setDepthWriteEnabled:YES];
+	MTLDepthStencilDescriptor *descriptor = [[MTLDepthStencilDescriptor alloc] init];
+	descriptor.depthCompareFunction = MTLCompareFunctionLess;
+	descriptor.depthWriteEnabled = YES;
+	self.depth = [self.device newDepthStencilStateWithDescriptor:descriptor];
 
-	self.depth = [self.device newDepthStencilStateWithDescriptor:depthDescriptor];
+	/*
+	 *	Layer count
+	 */
+
+	MTLStencilDescriptor *stencil = [[MTLStencilDescriptor alloc] init];
+	stencil.depthStencilPassOperation = MTLStencilOperationIncrementClamp;
+
+	descriptor = [[MTLDepthStencilDescriptor alloc] init];
+	descriptor.depthCompareFunction = MTLCompareFunctionAlways;
+	descriptor.backFaceStencil = stencil;
+	descriptor.frontFaceStencil = stencil;
+	descriptor.depthWriteEnabled = NO;
+	self.layerCountDepth = [self.device newDepthStencilStateWithDescriptor:descriptor];
 }
 
 /*
@@ -171,22 +191,16 @@
 - (void)setupPipeline
 {
 	/*
-	 *	Step 1: Get our library. This is the library of GPU methods that have
-	 *	been precompiled by Xcode
-	 */
-
-	self.library = [self.device newDefaultLibrary];
-
-	/*
-	 *	Step 2: Get our vertex and fragment functions. These should be the
+	 *	Get our vertex and fragment functions. These should be the
 	 *	same names as the functions declared in our MXShader file.
 	 */
 
 	self.vertexFunction = [self.library newFunctionWithName:@"vertex_main"];
 	self.fragmentFunction = [self.library newFunctionWithName:@"fragment_main"];
+	self.layerCountFunction = [self.library newFunctionWithName:@"layer_count"];
 
 	/*
-	 *	Step 3: Construct our vertex descriptor. We do this to map the
+	 *	Construct our vertex descriptor. We do this to map the
 	 *	offsets in our trangle buffer to the attrite offsets sent to our
 	 *	GPU. Because we're not using the Model I/O API to load a model, we
 	 *	build the MTLVertexDescriptor directly.
@@ -205,7 +219,7 @@
 
 
 	/*
-	 *	Step 4: Start building the pipeline descriptor. This is used to
+	 *	Start building the pipeline descriptor and pipeline. This is used to
 	 *	eventually build our pipeline state. Note if we were doing anything
 	 *	more complicated with our pipeline (such as using stencils or depth
 	 *	detection for 3D rendering) we'd set that stuff here.
@@ -218,11 +232,25 @@
 	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
 	pipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
 
+	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+
 	/*
-	 *	Build our pipeline state object.
+	 *	Build the pipeline for counting layers
 	 */
 
-	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+	pipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	pipelineDescriptor.vertexFunction = self.vertexFunction;
+	pipelineDescriptor.fragmentFunction = nil;
+	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
+	pipelineDescriptor.stencilAttachmentPixelFormat = MTLPixelFormatStencil8;
+
+	self.layerCountPipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+
+	/*
+	 *	Build the compute kernel to count the results
+	 */
+
+	self.countPipeline = [self.device newComputePipelineStateWithFunction:self.layerCountFunction error:nil];
 
 	/*
 	 *	Use the vertex descriptor to load our model.
@@ -286,38 +314,26 @@
 {
 	[self.view clear];
 	[self.view perspective:M_PI/3 aspect:size.width/size.height near:0.1 far:1000];
+
+	MTLTextureDescriptor *descriptor;
+
+	descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8 width:size.width height:size.height mipmapped:NO];
+	descriptor.storageMode = MTLStorageModePrivate;
+	descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+	self.layerCountStencil = [self.device newTextureWithDescriptor:descriptor];
 }
 
 - (void)drawInMTKView:(MTKView *)view
 {
-	/*
-	 *	First step: get the command buffer.
-	 */
+	id<MTLCommandBuffer> buffer;
+	MTLRenderPassDescriptor *descriptor;
+	id<MTLRenderCommandEncoder> encoder;
+	id<MTLComputeCommandEncoder> compute;
 
-	id<MTLCommandBuffer> buffer = [self.commandQueue commandBuffer];
-
-	/*
-	 *	Third create render command encoder by first building a
-	 *	descriptor and initializing it.
-	 */
-
-	MTLRenderPassDescriptor *descriptor = [view currentRenderPassDescriptor];
+	if (self.layerCountStencil == nil) return;
 
 	/*
-	 *	Use the descriptor to generate our encoder.
-	 */
-
-	id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
-
-	/*
-	 *	Set up our encoder by indicating the pipeline we will be using for
-	 *	rendering our triangle.
-	 */
-
-	[encoder setRenderPipelineState:self.pipeline];
-
-	/*
-	 *	Update the model transformation
+	 *	Populate uniform
 	 */
 
 	double elapsed = CACurrentMediaTime() - self.startTime;
@@ -330,19 +346,65 @@
 	u.view = self.view.ctm;
 	u.model = self.model.ctm;
 	u.inverse = self.model.inverseCtm;
+
+	/*
+	 *	Phase 1: Calculate the maximum number of layers and the layer stencil
+	 *	map
+	 */
+
+	buffer = [self.commandQueue commandBuffer];
+
+	descriptor = [[MTLRenderPassDescriptor alloc] init];
+	descriptor.stencilAttachment.texture = self.layerCountStencil;
+	descriptor.stencilAttachment.loadAction = MTLLoadActionClear;
+	descriptor.stencilAttachment.storeAction = MTLStoreActionStore;
+	descriptor.stencilAttachment.clearStencil = 0;
+
+	encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
+	[encoder setRenderPipelineState:self.layerCountPipeline];
+	[encoder setCullMode:MTLCullModeFront];
+	[encoder setDepthStencilState:self.layerCountDepth];
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 
-	/*
-	 *	Enable back-face culling
-	 */
-
+	// Render pass
 	[encoder setCullMode:MTLCullModeFront];
+	[self renderMesh:self.cube inEncoder:encoder];
+	[self renderMesh:self.sphere inEncoder:encoder];
+	[encoder setCullMode:MTLCullModeBack];
+	[self renderMesh:self.cylinders inEncoder:encoder];
+
+	[encoder endEncoding];
+
+	compute = [buffer computeCommandEncoder];
+	[compute setComputePipelineState:self.countPipeline];
+	[compute setTexture:self.layerCountStencil atIndex:0];
+	id<MTLBuffer> count = [self.device newBufferWithLength:sizeof(MXLayerCount) options:MTLResourceOptionCPUCacheModeDefault];
+	[compute setBuffer:count offset:0 atIndex:1];
+
+	MTLSize threadgroupCounts = MTLSizeMake(8, 8, 1);
+	MTLSize threadgroups = MTLSizeMake([self.layerCountStencil width] / threadgroupCounts.width, [self.layerCountStencil height] / threadgroupCounts.height, 1);
+	[compute dispatchThreadgroups:threadgroups threadsPerThreadgroup:threadgroupCounts];
+	[compute endEncoding];
+	// Debug. Figure out how to extract max value
+
+	[buffer commit];
+
+	// ### TODO: Seeparate
 
 	/*
-	 *	Set the depth stencil
+	 *	First step: get the command buffer.
 	 */
 
+	buffer = [self.commandQueue commandBuffer];
+
+	descriptor = [view currentRenderPassDescriptor];
+	encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
+	[encoder setRenderPipelineState:self.pipeline];
+	[encoder setCullMode:MTLCullModeFront];
 	[encoder setDepthStencilState:self.depth];
+	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 
 	/*
 	 *	Now tell our encoder about where our vertex information is located,
@@ -373,11 +435,6 @@
 	 */
 
 	[buffer presentDrawable:self.currentDrawable];
-
-	/*
-	 *	Finish and submit the buffer to the GPU
-	 */
-
 	[buffer commit];
 }
 

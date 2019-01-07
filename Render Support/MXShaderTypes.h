@@ -54,4 +54,9 @@ typedef struct MXUniforms
 	matrix_float4x4 inverse;	// inverse of model
 } MXUniforms;
 
+typedef struct MXLayerCount
+{
+	unsigned short count;
+} MXLayerCount;
+
 #endif /* MXShaderTypes_h */
