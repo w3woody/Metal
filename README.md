@@ -1,3 +1,22 @@
+# Example 10
+
+Example 10, showing deferred shading, is broken up into two separate branches.
+
+The first branch (this one) shows refactoring our rendering pipeline into two parts. The first generates the G-Buffer (graphics buffer) for our scene. The second pass uses the graphics information in our G-Buffer to calculate the graphics in our scene.
+
+When executed the results will look exactly the same as in our prior Example 9.
+
+![Screen Shot 10](Images/ScreenShot.png)
+
+However, if you example the graphics pipeline under the Xcode debugger you'll see the three stages of rendering: the first calculating the shadow map (from Example 8), the second calculating the G-Buffer, and the third using the G-Buffer to render the final scene.
+
+![Debug Information](Images/Debug.png)
+
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
