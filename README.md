@@ -1,3 +1,15 @@
+# Example 7
+
+The Example 7 branch of the Metal project shows using the stencil buffer in order to generate a reflected teapot effect.
+
+When compiled and run you should see a rotating green textured teapot with lighting effects, reflected in a mirror along the bottom:
+
+![Screen Shot 7](Images/ScreenShot.png)
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
