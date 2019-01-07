@@ -1,3 +1,15 @@
+# Example 5
+
+The Example 5 branch of the Metal project shows the additional steps for adding ambient, diffuse and specular lighting effects to the system, by extending the fragment shader of our renderer.
+
+When compiled and run you should see a rotating teapot with lighting effects:
+
+![Screen Shot 5](Images/ScreenShot.png)
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
