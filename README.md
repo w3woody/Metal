@@ -10,6 +10,14 @@ Thus these examples, and hopefully a PDF-based book which links to these example
 
 Because as they say, the best way to learn something is to try to teach it to someone else.
 
+# The Examples
+
+All of the example applications are checked into this GitHub repository as separate branches from Example 1 through to Example 11. The readme for each branch has been modified to show what each example does.
+
+# The Full Paper
+
+The full paper documents the individual steps illustrated in each example, and will eventually contain nutshell descriptions of the Metal shader language and other elements of the Metal API. The paper can be found as a PDF at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # License
 
 Copyright &copy; 2018 William Edward Woody, all rights reserved.
