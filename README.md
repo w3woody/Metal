@@ -1,3 +1,15 @@
+# Example 2
+
+The Example 2 branch of the Metal project shows the steps for rendering a simple triangle--including creating the shader functions and passing geometry to the GPU.
+
+When compiled and run you should see a blank screen filled in by the GPU:
+
+![Screen Shot 2](Images/ScreenShot.png)
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
