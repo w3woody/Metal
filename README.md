@@ -1,3 +1,19 @@
+# Example 11
+
+Example 11 shows adding a compute kernel to our rendering scene, by using a compute kernel to calculate the location of our fairy lights.
+
+When compiled it should look no different from our prior Example 10b.
+
+![Screen Shot 11](Images/ScreenShot.png)
+
+However, if you example the graphics pipeline under the Xcode debugger you'll see the addition of our compute kernel.
+
+![Debug Information](Images/Debug.png)
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
