@@ -1,3 +1,15 @@
+# Example 1
+
+The Example 1 branch of the Metal project shows the preliminary infrastructure necessary to set up a GPU device and present a blank image on a screen.
+
+When compiled and run you should see a blank screen filled in by the GPU:
+
+![Screen Shot 1](Images/ScreenShot.png)
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
