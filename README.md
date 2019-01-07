@@ -1,3 +1,15 @@
+# Example 10b
+
+Example 10, showing deferred shading, is broken up into two separate branches. This is the second half.
+
+The second example shows using the G-Buffer information in order to add an additional lighting effect--the glow from our fairy lights. When run the image should look like this:
+
+![Screen Shot 10b](Images/ScreenShot.png)
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
