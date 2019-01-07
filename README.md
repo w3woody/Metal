@@ -1,3 +1,15 @@
+# Example 4
+
+The Example 4 branch of the Metal project shows the additional steps for loading a 3D model (in this case, the Utah Teapot) from a resource in the application.
+
+When compiled and run you should see a rotating teapot:
+
+![Screen Shot 4](Images/ScreenShot.png)
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
