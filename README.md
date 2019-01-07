@@ -1,3 +1,15 @@
+# Example 8
+
+The Example 8 branch of the Metal project shows the use of a shadow map. This is an example of a more complex rendering effect in that we need to render the scene twice: first from the point of view of the light source, and second from the camera point of view.
+
+When compiled and run you should see a rotating green textured teapot with shadows:
+
+![Screen Shot 8](Images/ScreenShot.png)
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
