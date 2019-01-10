@@ -1,4 +1,4 @@
-# Example 11
+# Example 12
 
 Example 12 shows something different: using the algorithms described in [An improved z-buffer CSG rendering algorithm](https://dl.acm.org/citation.cfm?id=285308) in order to render three primitive objects through [constructive solid geometry](https://en.wikipedia.org/wiki/Constructive_solid_geometry).
 
@@ -6,7 +6,7 @@ Basically we are rendering the intersection of a sphere and a cube with a couple
 
 When compiled and run, you should see the results in real-time. The idea is that rather than calculate the geometry and then show the results, we calculate the appearance of the CSG operations on the fly.
 
-![Screen Shot 11](Images/ScreenShot.png)
+![Screen Shot 12](Images/ScreenShot.png)
 
 This does not implement the general purpose solution, but instead shows the Metal rendering calls necessary to produce the results.
 
