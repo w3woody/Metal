@@ -727,9 +727,9 @@
 	[compute setBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 	[compute setComputePipelineState:self.fkPipeline];
 
-	MTLSize threadGroupSize = MTLSizeMake(1, 1, 1);
+	MTLSize totalThreadSize = MTLSizeMake(MAX_FAIRYLIGHTS, 1, 1);
 	MTLSize threadsPerGroup = MTLSizeMake(MAX_FAIRYLIGHTS, 1, 1);
-	[compute dispatchThreads:threadsPerGroup threadsPerThreadgroup:threadGroupSize];
+	[compute dispatchThreads:totalThreadSize threadsPerThreadgroup:threadsPerGroup];
 	[compute endEncoding];
 
 	/*
