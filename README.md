@@ -1,3 +1,21 @@
+# Example 11
+
+Example 12 shows something different: using the algorithms described in [An improved z-buffer CSG rendering algorithm](https://dl.acm.org/citation.cfm?id=285308) in order to render three primitive objects through [constructive solid geometry](https://en.wikipedia.org/wiki/Constructive_solid_geometry).
+
+Basically we are rendering the intersection of a sphere and a cube with a couple of cylinders subtracted from the center.
+
+When compiled and run, you should see the results in real-time. The idea is that rather than calculate the geometry and then show the results, we calculate the appearance of the CSG operations on the fly.
+
+![Screen Shot 11](Images/ScreenShot.png)
+
+This does not implement the general purpose solution, but instead shows the Metal rendering calls necessary to produce the results.
+
+One of the aspects of the rendering process is using two separate command buffers; the first to calculate some preliminary results which are passed to the CPU, then a second buffer call which alters the metal rendering steps as required to correctly render the image.
+
+# The Full Paper
+
+This example is the first of several examples documented in my PDF available at the [Chaos In Motion Blog](https://chaosinmotion.blog/papers/); look for "Learning the Metal API" for the latest.
+
 # Metal
 
 I'm in the process of trying to learn the [Metal API](https://developer.apple.com/metal/) for the Macintosh. These are the example applications I'm constructing in order to illustrate parts of Metal in a step-by-step organized way.
