@@ -30,6 +30,8 @@ typedef enum MXVertexIndex
 typedef enum MXFragmentIndex
 {
 	MXFragmentIndexColor = 0,			/* Location of color vector */
+	MXFragmentIndexUniform = 1,
+	MXFragmentIndexShader = 2,
 } MXFragmentIndex;
 
 /*
@@ -44,6 +46,18 @@ typedef enum MXAttributeIndex
 } MXAttributeIndex;
 
 /*
+ *	Textures
+ */
+
+typedef enum MXTextureIndex
+{
+	MXTextureIndexInColor = 0,
+	MXTextureIndexInDepth = 1,
+	MXTextureIndexOutColor = 2,
+	MXTextureIndexOutDepth = 3
+} MXTextureIndex;
+
+/*
  *	Uniforms structure
  */
 
@@ -56,7 +70,7 @@ typedef struct MXUniforms
 
 typedef struct MXLayerCount
 {
-	unsigned short count;
+	uint32_t count;				// 4 byte value
 } MXLayerCount;
 
 #endif /* MXShaderTypes_h */

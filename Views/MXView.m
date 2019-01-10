@@ -13,6 +13,9 @@
 
 @interface MXView () <MTKViewDelegate>
 
+// Rendering semaphore
+@property (strong) dispatch_semaphore_t semaphore;
+
 // Command queue
 @property (strong) id<MTLCommandQueue> commandQueue;
 
@@ -23,20 +26,45 @@
 
 // Pipeline state stuff
 @property (strong) id<MTLLibrary> library;
-@property (strong) id<MTLFunction> vertexFunction;
-@property (strong) id<MTLFunction> fragmentFunction;
-@property (strong) id<MTLRenderPipelineState> pipeline;
 
-// Depth stencil
-@property (strong) id<MTLDepthStencilState> depth;
+// Clear depth start
+@property (strong) id<MTLComputePipelineState> clearDepthPipeline;
 
-// Layer counting resources
+// Off screen color/depth buffers
+@property (strong) id<MTLTexture> colorTexture;
+@property (strong) id<MTLTexture> depthTexture;
+@property (strong) id<MTLTexture> screenDepth;
+@property (strong) id<MTLTexture> outTexture;
+@property (strong) id<MTLTexture> stencilTexture;
+@property (strong) id<MTLBuffer> sumsBuffer;
+@property (strong) id<MTLBuffer> uniforms;
+
+// Layer counting
 @property (strong) id<MTLRenderPipelineState> layerCountPipeline;
-@property (strong) id<MTLDepthStencilState> layerCountDepth;
-@property (strong) id<MTLTexture> layerCountStencil;
-
-@property (strong) id<MTLFunction> layerCountFunction;
 @property (strong) id<MTLComputePipelineState> countPipeline;
+@property (strong) id<MTLDepthStencilState> layerCountStencil;
+
+// Layer extraction pipeline, stencil state
+@property (strong) id<MTLRenderPipelineState> layerExtractPipeline;
+@property (strong) id<MTLDepthStencilState> layerExtractStencil;
+
+// Compute pipelines for support
+@property (strong) id<MTLComputePipelineState> clearStencilPipeline;
+
+// Layer parity test pipeline, stencil state
+@property (strong) id<MTLRenderPipelineState> layerParityPipeline;
+@property (strong) id<MTLDepthStencilState> layerParityStencil;
+
+// Layer clear pipeline, stencil state. Used to clear rejected pixels
+@property (strong) id<MTLRenderPipelineState> layerClearPipeline;
+@property (strong) id<MTLDepthStencilState> layerClearStencil;
+@property (strong) id<MTLBuffer> square;
+
+// Merge pipeline
+@property (strong) id<MTLComputePipelineState> layerMergePipeline;
+
+// Output pipeline
+@property (strong) id<MTLRenderPipelineState> outputResultPipeline;
 
 // Transformation matrices
 @property (strong) MXTransformationStack *view;
@@ -106,8 +134,8 @@
 	[self setupPipeline];
 	[self setupTransformation];
 	[self setupDepthStencilState];
-
-
+	[self setupSquare];
+	[self setupUniforms];
 
 	// Kludge to make sure our size is drawin in the proper order
 	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -137,7 +165,6 @@
 
 	self.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
 	self.clearColor = MTLClearColorMake(0.1, 0.1, 0.2, 1.0);
-	self.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
 
 	// The following two calls essentially change the behavior of our view
 	// so that it only updates on setNeedsDisplay. This behavior is useful
@@ -150,24 +177,25 @@
 	 */
 
 	self.commandQueue = [self.device newCommandQueue];
+
+	/*
+	 *	Semaphore
+	 */
+
+	self.semaphore = dispatch_semaphore_create(1);
 }
 
 - (void)setupDepthStencilState
 {
-	/*
-	 *	Set up the depth stencil
-	 */
-
-	MTLDepthStencilDescriptor *descriptor = [[MTLDepthStencilDescriptor alloc] init];
-	descriptor.depthCompareFunction = MTLCompareFunctionLess;
-	descriptor.depthWriteEnabled = YES;
-	self.depth = [self.device newDepthStencilStateWithDescriptor:descriptor];
+	MTLDepthStencilDescriptor *descriptor;
+	MTLStencilDescriptor *stencil;
 
 	/*
-	 *	Layer count
+	 *	Layer counting.
 	 */
 
-	MTLStencilDescriptor *stencil = [[MTLStencilDescriptor alloc] init];
+	stencil = [[MTLStencilDescriptor alloc] init];
+	stencil.stencilCompareFunction = MTLCompareFunctionAlways;
 	stencil.depthStencilPassOperation = MTLStencilOperationIncrementClamp;
 
 	descriptor = [[MTLDepthStencilDescriptor alloc] init];
@@ -175,7 +203,63 @@
 	descriptor.backFaceStencil = stencil;
 	descriptor.frontFaceStencil = stencil;
 	descriptor.depthWriteEnabled = NO;
-	self.layerCountDepth = [self.device newDepthStencilStateWithDescriptor:descriptor];
+	self.layerCountStencil = [self.device newDepthStencilStateWithDescriptor:descriptor];
+
+	/*
+	 *	Layer extraction. This is used to draw the 'kth' layer of an image,
+	 *	as the first part of drawing each product layer. Note we can save
+	 *	ourselves a bunch of effort by ignoring the depth compare.
+	 */
+
+	stencil = [[MTLStencilDescriptor alloc] init];
+	stencil.stencilCompareFunction = MTLCompareFunctionEqual;
+	stencil.depthStencilPassOperation = MTLStencilOperationIncrementClamp;
+	stencil.stencilFailureOperation = MTLStencilOperationIncrementClamp;
+	stencil.depthFailureOperation = MTLStencilOperationIncrementClamp;
+
+	descriptor = [[MTLDepthStencilDescriptor alloc] init];
+	descriptor.depthCompareFunction = MTLCompareFunctionAlways;
+	descriptor.backFaceStencil = stencil;
+	descriptor.frontFaceStencil = stencil;
+	descriptor.depthWriteEnabled = YES;
+	self.layerExtractStencil = [self.device newDepthStencilStateWithDescriptor:descriptor];
+
+	/*
+	 *	Parity testing. This basically does everything but play with the
+	 *	stencil, since we're using a 32-bit texture array as our stencil.
+	 */
+
+	stencil = [[MTLStencilDescriptor alloc] init];
+	stencil.depthStencilPassOperation = MTLStencilOperationInvert;
+	stencil.stencilFailureOperation = MTLStencilOperationKeep;
+	stencil.depthFailureOperation = MTLStencilOperationKeep;
+	stencil.readMask = 1;
+	stencil.writeMask = 1;
+
+	descriptor = [[MTLDepthStencilDescriptor alloc] init];
+	descriptor.depthCompareFunction = MTLCompareFunctionLessEqual;
+	descriptor.depthWriteEnabled = NO;
+	descriptor.backFaceStencil = stencil;
+	descriptor.frontFaceStencil = stencil;
+	self.layerParityStencil = [self.device newDepthStencilStateWithDescriptor:descriptor];
+
+	/*
+	 *	Clear testing. This essentially clears all that doesn't match
+	 *	the stencil
+	 */
+
+	stencil = [[MTLStencilDescriptor alloc] init];
+	stencil.stencilCompareFunction = MTLCompareFunctionNotEqual;
+	stencil.depthStencilPassOperation = MTLStencilOperationZero;
+	stencil.stencilFailureOperation = MTLStencilOperationZero;
+	stencil.depthFailureOperation = MTLStencilOperationZero;
+
+	descriptor = [[MTLDepthStencilDescriptor alloc] init];
+	descriptor.depthCompareFunction = MTLCompareFunctionAlways;
+	descriptor.depthWriteEnabled = YES;
+	descriptor.backFaceStencil = stencil;
+	descriptor.frontFaceStencil = stencil;
+	self.layerClearStencil = [self.device newDepthStencilStateWithDescriptor:descriptor];
 }
 
 /*
@@ -190,14 +274,21 @@
 
 - (void)setupPipeline
 {
+	MTLRenderPipelineDescriptor *pipelineDescriptor;
+
 	/*
 	 *	Get our vertex and fragment functions. These should be the
 	 *	same names as the functions declared in our MXShader file.
 	 */
 
-	self.vertexFunction = [self.library newFunctionWithName:@"vertex_main"];
-	self.fragmentFunction = [self.library newFunctionWithName:@"fragment_main"];
-	self.layerCountFunction = [self.library newFunctionWithName:@"layer_count"];
+	id<MTLFunction> vertexFunction = [self.library newFunctionWithName:@"vertex_main"];
+	id<MTLFunction> fragmentFunction = [self.library newFunctionWithName:@"fragment_main"];
+	id<MTLFunction> screenVertexFunction = [self.library newFunctionWithName:@"vertex_screen"];
+	id<MTLFunction> screenFragmentFunction = [self.library newFunctionWithName:@"fragment_screen"];
+	id<MTLFunction> mergeFunction = [self.library newFunctionWithName:@"layer_merge"];
+	id<MTLFunction> clearDepth = [self.library newFunctionWithName:@"layer_cleardepth"];
+	id<MTLFunction> outputFunction = [self.library newFunctionWithName:@"output_fragment"];
+	id<MTLFunction> countFunction = [self.library newFunctionWithName:@"layer_count"];
 
 	/*
 	 *	Construct our vertex descriptor. We do this to map the
@@ -217,29 +308,13 @@
 	d.attributes[2] = [[MDLVertexAttribute alloc] initWithName:MDLVertexAttributeTextureCoordinate format:MDLVertexFormatFloat2 offset:sizeof(vector_float3) * 2 bufferIndex:0];
 	d.layouts[0] = [[MDLVertexBufferLayout alloc] initWithStride:sizeof(MXVertex)];
 
-
 	/*
-	 *	Start building the pipeline descriptor and pipeline. This is used to
-	 *	eventually build our pipeline state. Note if we were doing anything
-	 *	more complicated with our pipeline (such as using stencils or depth
-	 *	detection for 3D rendering) we'd set that stuff here.
-	 */
-
-	MTLRenderPipelineDescriptor *pipelineDescriptor = [MTLRenderPipelineDescriptor new];
-	pipelineDescriptor.vertexFunction = self.vertexFunction;
-	pipelineDescriptor.fragmentFunction = self.fragmentFunction;
-	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
-	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
-	pipelineDescriptor.depthAttachmentPixelFormat = self.depthStencilPixelFormat;
-
-	self.pipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
-
-	/*
-	 *	Build the pipeline for counting layers
+	 *	Layer extraction pipeline. This is used to extract the kth layer and
+	 *	render the layer to or display.
 	 */
 
 	pipelineDescriptor = [MTLRenderPipelineDescriptor new];
-	pipelineDescriptor.vertexFunction = self.vertexFunction;
+	pipelineDescriptor.vertexFunction = vertexFunction;
 	pipelineDescriptor.fragmentFunction = nil;
 	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
 	pipelineDescriptor.stencilAttachmentPixelFormat = MTLPixelFormatStencil8;
@@ -247,13 +322,79 @@
 	self.layerCountPipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
 
 	/*
-	 *	Build the compute kernel to count the results
+	 *	Layer extraction pipeline. This is used to extract the kth layer and
+	 *	render the layer to or display.
 	 */
 
-	self.countPipeline = [self.device newComputePipelineStateWithFunction:self.layerCountFunction error:nil];
+	pipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	pipelineDescriptor.vertexFunction = vertexFunction;
+	pipelineDescriptor.fragmentFunction = fragmentFunction;
+	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
+	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+	pipelineDescriptor.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+	pipelineDescriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+
+	self.layerExtractPipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
 
 	/*
-	 *	Use the vertex descriptor to load our model.
+	 *	Layer parity pipeline. This is used to determine the parity count when
+	 *	calculating render layers
+	 */
+
+	pipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	pipelineDescriptor.vertexFunction = vertexFunction;
+	pipelineDescriptor.fragmentFunction = nil;
+	pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(d);
+	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+	pipelineDescriptor.colorAttachments[0].writeMask = MTLColorWriteMaskNone;
+	pipelineDescriptor.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+	pipelineDescriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+
+	self.layerParityPipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+
+	/*
+	 *	Layer clear pipeline. This is used to determine the parity count when
+	 *	calculating render layers
+	 */
+
+	MTLVertexDescriptor *dsc = [[MTLVertexDescriptor alloc] init];
+	dsc.attributes[0].offset = 0;
+	dsc.attributes[0].bufferIndex = 0;
+	dsc.attributes[0].format = MTLVertexFormatFloat2;
+	dsc.layouts[0].stride = sizeof(MXScreenVertex);
+
+	pipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	pipelineDescriptor.vertexFunction = screenVertexFunction;
+	pipelineDescriptor.fragmentFunction = screenFragmentFunction;
+	pipelineDescriptor.vertexDescriptor = dsc;
+	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+	pipelineDescriptor.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+	pipelineDescriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+
+	self.layerClearPipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+
+	pipelineDescriptor = [MTLRenderPipelineDescriptor new];
+	pipelineDescriptor.vertexFunction = screenVertexFunction;
+	pipelineDescriptor.fragmentFunction = outputFunction;
+	pipelineDescriptor.vertexDescriptor = dsc;
+	pipelineDescriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+
+	self.outputResultPipeline = [self.device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:nil];
+
+	/*
+	 *	Layer merge, clear depth
+	 */
+
+	self.layerMergePipeline = [self.device newComputePipelineStateWithFunction:mergeFunction error:nil];
+	self.clearDepthPipeline = [self.device newComputePipelineStateWithFunction:clearDepth error:nil];
+	self.countPipeline = [self.device newComputePipelineStateWithFunction:countFunction error:nil];
+
+//	### TODO: Finish writing code which clears according to the stencil above.
+//	### Add code to repeat for the other three objects in our scene.
+//	### Add code to repeat for the full four layers in our scene.
+
+	/*
+	 *	Use the vertex descriptor to load our models.
 	 */
 
 	NSURL *modelURL;
@@ -281,6 +422,28 @@
 {
 	self.view = [[MXTransformationStack alloc] init];
 	self.model = [[MXTransformationStack alloc] init];
+}
+
+/*
+ *	Setup geometry
+ */
+
+- (void)setupSquare
+{
+	static const MXScreenVertex square[] = {
+		{ { -1, -1 } },
+		{ { -1,  1 } },
+		{ {  1, -1 } },
+		{ { -1,  1 } },
+		{ {  1, -1 } },
+		{ {  1,  1 } }
+	};
+	self.square = [self.device newBufferWithBytes:square length:sizeof(square) options:MTLResourceOptionCPUCacheModeDefault];
+}
+
+- (void)setupUniforms
+{
+	self.uniforms = [self.device newBufferWithLength:sizeof(MXUniforms) options:MTLResourceOptionCPUCacheModeDefault];
 }
 
 /****************************************************************************/
@@ -315,12 +478,34 @@
 	[self.view clear];
 	[self.view perspective:M_PI/3 aspect:size.width/size.height near:0.1 far:1000];
 
+	/*
+	 *	Offscreen texturing
+	 */
+
 	MTLTextureDescriptor *descriptor;
+
+	descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float_Stencil8 width:size.width height:size.height mipmapped:NO];
+	descriptor.storageMode = MTLStorageModePrivate;
+	descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+	self.depthTexture = [self.device newTextureWithDescriptor:descriptor];
+
+	descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:self.colorPixelFormat width:size.width height:size.height mipmapped:NO];
+	descriptor.storageMode = MTLStorageModePrivate;
+	descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+	self.colorTexture = [self.device newTextureWithDescriptor:descriptor];
+	self.outTexture = [self.device newTextureWithDescriptor:descriptor];
+
+	descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatR32Float width:size.width height:size.height mipmapped:NO];
+	descriptor.storageMode = MTLStorageModePrivate;
+	descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+	self.screenDepth = [self.device newTextureWithDescriptor:descriptor];
 
 	descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8 width:size.width height:size.height mipmapped:NO];
 	descriptor.storageMode = MTLStorageModePrivate;
-	descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
-	self.layerCountStencil = [self.device newTextureWithDescriptor:descriptor];
+	descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+	self.stencilTexture = [self.device newTextureWithDescriptor:descriptor];
+
+	self.sumsBuffer = [self.device newBufferWithLength:size.width options:MTLResourceOptionCPUCacheModeDefault];
 }
 
 - (void)drawInMTKView:(MTKView *)view
@@ -329,8 +514,21 @@
 	MTLRenderPassDescriptor *descriptor;
 	id<MTLRenderCommandEncoder> encoder;
 	id<MTLComputeCommandEncoder> compute;
+	MTLSize threadGroupSize;
+	NSUInteger s;
+	MTLSize threadsPerGroup;
 
-	if (self.layerCountStencil == nil) return;
+	/*
+	 *	Return if not initialized
+	 */
+
+	if (self.colorTexture == nil) return;
+
+	/*
+	 *	Semaphore limits access
+	 */
+
+	dispatch_semaphore_wait(self.semaphore, DISPATCH_TIME_FOREVER);
 
 	/*
 	 *	Populate uniform
@@ -346,6 +544,7 @@
 	u.view = self.view.ctm;
 	u.model = self.model.ctm;
 	u.inverse = self.model.inverseCtm;
+	memmove(self.uniforms.contents,&u,sizeof(u));
 
 	/*
 	 *	Phase 1: Calculate the maximum number of layers and the layer stencil
@@ -355,7 +554,7 @@
 	buffer = [self.commandQueue commandBuffer];
 
 	descriptor = [[MTLRenderPassDescriptor alloc] init];
-	descriptor.stencilAttachment.texture = self.layerCountStencil;
+	descriptor.stencilAttachment.texture = self.stencilTexture;
 	descriptor.stencilAttachment.loadAction = MTLLoadActionClear;
 	descriptor.stencilAttachment.storeAction = MTLStoreActionStore;
 	descriptor.stencilAttachment.clearStencil = 0;
@@ -364,7 +563,7 @@
 
 	[encoder setRenderPipelineState:self.layerCountPipeline];
 	[encoder setCullMode:MTLCullModeFront];
-	[encoder setDepthStencilState:self.layerCountDepth];
+	[encoder setDepthStencilState:self.layerCountStencil];
 	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
 
 	// Render pass
@@ -373,60 +572,233 @@
 	[self renderMesh:self.sphere inEncoder:encoder];
 	[encoder setCullMode:MTLCullModeBack];
 	[self renderMesh:self.cylinders inEncoder:encoder];
-
 	[encoder endEncoding];
+
+	NSInteger width = [self.stencilTexture width];
 
 	compute = [buffer computeCommandEncoder];
 	[compute setComputePipelineState:self.countPipeline];
-	[compute setTexture:self.layerCountStencil atIndex:0];
-	id<MTLBuffer> count = [self.device newBufferWithLength:sizeof(MXLayerCount) options:MTLResourceOptionCPUCacheModeDefault];
-	[compute setBuffer:count offset:0 atIndex:1];
+	[compute setTexture:self.stencilTexture atIndex:0];
+	[compute setBuffer:self.sumsBuffer offset:0 atIndex:1];
+	memset(self.sumsBuffer.contents,0,width);
 
-	MTLSize threadgroupCounts = MTLSizeMake(8, 8, 1);
-	MTLSize threadgroups = MTLSizeMake([self.layerCountStencil width] / threadgroupCounts.width, [self.layerCountStencil height] / threadgroupCounts.height, 1);
-	[compute dispatchThreadgroups:threadgroups threadsPerThreadgroup:threadgroupCounts];
+	threadGroupSize = MTLSizeMake(width, [self.stencilTexture height], 1);
+	s = self.countPipeline.maxTotalThreadsPerThreadgroup;
+	threadsPerGroup = MTLSizeMake(s, 1, 1);
+	[compute dispatchThreads:threadGroupSize threadsPerThreadgroup:threadsPerGroup];
 	[compute endEncoding];
 	// Debug. Figure out how to extract max value
 
-	[buffer commit];
+	[buffer addCompletedHandler:^(id<MTLCommandBuffer> cmdBuffer) {
+		uint8_t klen = 0;
+		uint8_t *buf = (uint8_t *)self.sumsBuffer.contents;
+		for (NSInteger i = 0; i < width; ++i) {
+			if (klen < buf[i]) klen = buf[i];
+		}
 
-	// ### TODO: Seeparate
+		[self renderPhaseTwoWithKLen:klen];
+	}];
+
+	[buffer commit];
+}
+
+- (void)renderPhaseTwoWithKLen:(uint8_t)klen
+{
+	id<MTLCommandBuffer> buffer;
+	MTLRenderPassDescriptor *descriptor;
+	id<MTLRenderCommandEncoder> encoder;
+	id<MTLComputeCommandEncoder> compute;
+	MTLSize threadGroupSize;
+	NSUInteger s;
+	MTLSize threadsPerGroup;
+	vector_float3 color;
 
 	/*
-	 *	First step: get the command buffer.
+	 *	Phase 2: run the calculations to render our scene based on the found
+	 *	depth parameter
 	 */
 
 	buffer = [self.commandQueue commandBuffer];
 
-	descriptor = [view currentRenderPassDescriptor];
+	[buffer addCompletedHandler:^(id<MTLCommandBuffer> cmdBuffer) {
+		dispatch_semaphore_signal(self.semaphore);
+	}];
+
+	/*
+	 *	Clear depth
+	 */
+
+	compute = [buffer computeCommandEncoder];
+	[compute setComputePipelineState:self.clearDepthPipeline];
+	[compute setTexture:self.screenDepth atIndex:MXTextureIndexOutDepth];
+	[compute setTexture:self.outTexture atIndex:MXTextureIndexOutColor];
+
+	threadGroupSize = MTLSizeMake([self.colorTexture width], [self.colorTexture height], 1);
+	s = sqrt(self.layerMergePipeline.maxTotalThreadsPerThreadgroup);
+	threadsPerGroup = MTLSizeMake(s, s, 1);
+
+	[compute dispatchThreads:threadGroupSize threadsPerThreadgroup:threadsPerGroup];
+	[compute endEncoding];
+
+
+	/*
+	 *	Test layer merging of two objects assuming fixed k. (Note k maxes at 4)
+	 */
+
+
+	for (int k = 0; k < klen; ++k) {
+		/*
+		 *	Render kth layer
+		 */
+
+		descriptor = [[MTLRenderPassDescriptor alloc] init];
+		descriptor.depthAttachment.texture = self.depthTexture;
+		descriptor.depthAttachment.loadAction = MTLLoadActionClear;
+		descriptor.depthAttachment.storeAction = MTLStoreActionStore;
+		descriptor.depthAttachment.clearDepth = 1.0;
+		descriptor.stencilAttachment.texture = self.depthTexture;
+		descriptor.stencilAttachment.loadAction = MTLLoadActionClear;
+		descriptor.stencilAttachment.storeAction = MTLStoreActionDontCare;
+		descriptor.stencilAttachment.clearStencil = 0;
+		descriptor.colorAttachments[0].texture = self.colorTexture;
+		descriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+		descriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+		descriptor.colorAttachments[0].clearColor = self.clearColor;
+		encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
+		[encoder setRenderPipelineState:self.layerExtractPipeline];
+		[encoder setDepthStencilState:self.layerExtractStencil];
+		[encoder setVertexBuffer:self.uniforms offset:0 atIndex:MXVertexIndexUniforms];
+		[encoder setStencilReferenceValue:k];
+
+		[encoder setCullMode:MTLCullModeFront];
+
+		color = (vector_float3){ 1, 0.5, 0.3 };
+		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
+		[self renderMesh:self.cube inEncoder:encoder];
+
+		color = (vector_float3){ 0.3, 1.0, 0.3 };
+		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
+		[self renderMesh:self.sphere inEncoder:encoder];
+
+		[encoder setCullMode:MTLCullModeBack];
+
+		color = (vector_float3){ 0.3, 0.5, 1.0 };
+		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
+		[self renderMesh:self.cylinders inEncoder:encoder];
+
+		[encoder endEncoding];
+
+		/*
+		 *	Do parity testing pass. At the end we'll have a bit array set
+		 */
+
+		descriptor = [[MTLRenderPassDescriptor alloc] init];
+		descriptor.depthAttachment.texture = self.depthTexture;
+		descriptor.depthAttachment.loadAction = MTLLoadActionLoad;
+		descriptor.depthAttachment.storeAction = MTLStoreActionStore;
+		descriptor.stencilAttachment.texture = self.depthTexture;
+		descriptor.stencilAttachment.loadAction = MTLLoadActionClear;
+		descriptor.stencilAttachment.storeAction = MTLStoreActionDontCare;
+		descriptor.stencilAttachment.clearStencil = 0;
+		descriptor.colorAttachments[0].texture = self.colorTexture;
+		descriptor.colorAttachments[0].loadAction = MTLLoadActionLoad;
+		descriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+		descriptor.colorAttachments[0].clearColor = self.clearColor;
+		encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
+		// Render phase
+		[encoder setRenderPipelineState:self.layerParityPipeline];
+		[encoder setDepthStencilState:self.layerParityStencil];
+		[encoder setStencilReferenceValue:1];
+		[encoder setVertexBuffer:self.uniforms offset:0 atIndex:MXVertexIndexUniforms];
+		[encoder setCullMode:MTLCullModeNone];
+
+		MTLClearColor clearColor = self.clearColor;
+		color = (vector_float3){ clearColor.red, clearColor.green, clearColor.blue };
+		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
+		[self renderMesh:self.cube inEncoder:encoder];
+
+		// Hide phase
+		[encoder setRenderPipelineState:self.layerClearPipeline];
+		[encoder setDepthStencilState:self.layerClearStencil];
+		[encoder setStencilReferenceValue:1];	// Odd: not subtracted
+		[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+		[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+
+		[encoder endEncoding];
+
+		// Render phase
+		encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
+		[encoder setRenderPipelineState:self.layerParityPipeline];
+		[encoder setDepthStencilState:self.layerParityStencil];
+		[encoder setStencilReferenceValue:1];
+		[encoder setVertexBuffer:self.uniforms offset:0 atIndex:MXVertexIndexUniforms];
+		[encoder setCullMode:MTLCullModeNone];
+
+		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
+		[self renderMesh:self.sphere inEncoder:encoder];
+
+		// Hide phase
+		[encoder setRenderPipelineState:self.layerClearPipeline];
+		[encoder setDepthStencilState:self.layerClearStencil];
+		[encoder setStencilReferenceValue:1];	// Odd: not subtracted
+		[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+		[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+
+		[encoder endEncoding];
+
+		// Render phase
+		encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
+
+		[encoder setRenderPipelineState:self.layerParityPipeline];
+		[encoder setDepthStencilState:self.layerParityStencil];
+		[encoder setStencilReferenceValue:1];
+		[encoder setVertexBuffer:self.uniforms offset:0 atIndex:MXVertexIndexUniforms];
+		[encoder setCullMode:MTLCullModeNone];
+
+		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
+		[self renderMesh:self.cylinders inEncoder:encoder];
+
+		// Hide phase
+		[encoder setRenderPipelineState:self.layerClearPipeline];
+		[encoder setDepthStencilState:self.layerClearStencil];
+		[encoder setStencilReferenceValue:0];	// Even: subtracted
+		[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+		[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+		[encoder endEncoding];
+
+		/*
+		 *	Merge phase uses a compute kernel to do the merging
+		 */
+
+		compute = [buffer computeCommandEncoder];
+		[compute setComputePipelineState:self.layerMergePipeline];
+		[compute setTexture:self.colorTexture atIndex:MXTextureIndexInColor];
+		[compute setTexture:self.depthTexture atIndex:MXTextureIndexInDepth];
+		[compute setTexture:self.outTexture atIndex:MXTextureIndexOutColor];
+		[compute setTexture:self.screenDepth atIndex:MXTextureIndexOutDepth];
+
+		MTLSize threadGroupSize = MTLSizeMake([self.colorTexture width], [self.colorTexture height], 1);
+		uint s = sqrt(self.layerMergePipeline.maxTotalThreadsPerThreadgroup);
+		MTLSize threadsPerGroup = MTLSizeMake(s, s, 1);
+
+		[compute dispatchThreads:threadGroupSize threadsPerThreadgroup:threadsPerGroup];
+		[compute endEncoding];
+	}
+
+	/*
+	 *	Final step: render to screen
+	 */
+
+	descriptor = self.currentRenderPassDescriptor;
 	encoder = [buffer renderCommandEncoderWithDescriptor:descriptor];
 
-	[encoder setRenderPipelineState:self.pipeline];
-	[encoder setCullMode:MTLCullModeFront];
-	[encoder setDepthStencilState:self.depth];
-	[encoder setVertexBytes:&u length:sizeof(MXUniforms) atIndex:MXVertexIndexUniforms];
-
-	/*
-	 *	Now tell our encoder about where our vertex information is located,
-	 *	and ask it to render our triangle.
-	 */
-
-	vector_float3 color = { 1, 0.5, 0.3 };
-	[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
-	[self renderMesh:self.cube inEncoder:encoder];
-
-	color = (vector_float3){ 0.3, 1.0, 0.3 };
-	[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
-	[self renderMesh:self.sphere inEncoder:encoder];
-
-	color = (vector_float3){ 0.3, 0.5, 1.0 };
-	[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
-	[self renderMesh:self.cylinders inEncoder:encoder];
-
-	/*
-	 *	Commit the encoder, which finishes drawing for this rendering pass
-	 */
-
+	[encoder setRenderPipelineState:self.outputResultPipeline];
+	[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+	[encoder setFragmentTexture:self.outTexture atIndex:MXTextureIndexInColor];
+	[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
 	[encoder endEncoding];
 
 	/*

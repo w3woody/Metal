@@ -36,6 +36,22 @@ struct VertexOut
 	float2 texture;
 };
 
+/*	ScreenVertexIn
+ *
+ *		Screen vertices
+ */
+
+struct ScreenVertexIn
+{
+    float2 position  [[attribute(MXAttributeIndexPosition)]];
+};
+
+struct ScreenVertexOut
+{
+	float4 position [[position]];
+};
+
+
 /****************************************************************************/
 /*																			*/
 /*	Shaders																	*/
@@ -118,6 +134,37 @@ fragment float4 fragment_main(VertexOut v [[stage_in]],
 	return ambient + diffuse + specular;
 }
 
+/****************************************************************************/
+/*																			*/
+/*	Screen Vertex Function													*/
+/*																			*/
+/****************************************************************************/
+
+/*	vertex_screen
+ *
+ *		The vertex shader used to handle screen-sized processing using a 2D
+ *	screen vertex
+ */
+
+vertex ScreenVertexOut vertex_screen(ScreenVertexIn v [[stage_in]])
+{
+	ScreenVertexOut out;
+	out.position = float4(v.position,1,1);
+	return out;
+}
+
+fragment float4 fragment_screen(ScreenVertexOut u [[stage_in]],
+								constant float3 &objectColor [[buffer(MXFragmentIndexColor)]])
+{
+	return float4(objectColor,1);
+}
+
+fragment float4 output_fragment(ScreenVertexOut u [[stage_in]],
+								texture2d<float, access::read> inColor [[texture(MXTextureIndexInColor)]])
+{
+	uint2 pos = (uint2)u.position.xy;
+	return inColor.read(pos);
+}
 
 /****************************************************************************/
 /*																			*/
@@ -132,8 +179,48 @@ fragment float4 fragment_main(VertexOut v [[stage_in]],
 
 kernel void layer_count(texture2d<ushort, access::read> stencil [[texture(0)]],
 						uint2 ix [[thread_position_in_grid]],
-						device MXLayerCount &c [[buffer(1)]])
+						device uint8_t *c [[buffer(1)]])
 {
 	ushort val = stencil.read(ix).x;
-	if (c.count < val) c.count = val;
+	if (c[ix.x] < val) c[ix.x] = val;
+}
+
+/****************************************************************************/
+/*																			*/
+/*	Compute Kernel															*/
+/*																			*/
+/****************************************************************************/
+
+/*	layer_merge
+ *
+ *		Merge kernel
+ */
+
+kernel void layer_merge(texture2d<float, access::read> inColor [[texture(MXTextureIndexInColor)]],
+						depth2d<float, access::read> inDepth [[texture(MXTextureIndexInDepth)]],
+						texture2d<float, access::write> outColor [[texture(MXTextureIndexOutColor)]],
+						texture2d<float, access::read_write> outDepth [[texture(MXTextureIndexOutDepth)]],
+						uint2 index [[thread_position_in_grid]])
+{
+	float4 inc = inColor.read(index);
+	float ind = inDepth.read(index);
+	float curd = outDepth.read(index).r;
+
+	if (ind < curd) {
+		outDepth.write(ind,index);
+		outColor.write(inc,index);
+	}
+}
+
+/*	layer_cleardepth
+ *
+ *		Merge kernel
+ */
+
+kernel void layer_cleardepth(texture2d<float, access::write> outColor [[texture(MXTextureIndexOutColor)]],
+							texture2d<float, access::write> outDepth [[texture(MXTextureIndexOutDepth)]],
+						uint2 index [[thread_position_in_grid]])
+{
+	outColor.write(float4(0,0,0,1),index);
+	outDepth.write(1.0,index);
 }

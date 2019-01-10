@@ -48,4 +48,9 @@ typedef struct MXVertex
 	vector_float2 texture;
 } MXVertex;
 
+typedef struct MXScreenVertex
+{
+	vector_float2 position;
+} MXScreenVertex;
+
 #endif /* MXGeometry_h */
