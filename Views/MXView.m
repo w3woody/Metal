@@ -693,6 +693,10 @@
 		 *	Do parity testing pass. At the end we'll have a bit array set
 		 */
 
+
+		MTLClearColor clearColor = self.clearColor;
+		color = (vector_float3){ clearColor.red, clearColor.green, clearColor.blue };
+
 		descriptor = [[MTLRenderPassDescriptor alloc] init];
 		descriptor.depthAttachment.texture = self.depthTexture;
 		descriptor.depthAttachment.loadAction = MTLLoadActionLoad;
@@ -714,9 +718,6 @@
 		[encoder setVertexBuffer:self.uniforms offset:0 atIndex:MXVertexIndexUniforms];
 		[encoder setCullMode:MTLCullModeNone];
 
-		MTLClearColor clearColor = self.clearColor;
-		color = (vector_float3){ clearColor.red, clearColor.green, clearColor.blue };
-		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
 		[self renderMesh:self.cube inEncoder:encoder];
 
 		// Hide phase
@@ -724,6 +725,7 @@
 		[encoder setDepthStencilState:self.layerClearStencil];
 		[encoder setStencilReferenceValue:1];	// Odd: not subtracted
 		[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
 		[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
 
 		[encoder endEncoding];
@@ -736,8 +738,6 @@
 		[encoder setStencilReferenceValue:1];
 		[encoder setVertexBuffer:self.uniforms offset:0 atIndex:MXVertexIndexUniforms];
 		[encoder setCullMode:MTLCullModeNone];
-
-		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
 		[self renderMesh:self.sphere inEncoder:encoder];
 
 		// Hide phase
@@ -745,6 +745,7 @@
 		[encoder setDepthStencilState:self.layerClearStencil];
 		[encoder setStencilReferenceValue:1];	// Odd: not subtracted
 		[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
 		[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
 
 		[encoder endEncoding];
@@ -757,8 +758,6 @@
 		[encoder setStencilReferenceValue:1];
 		[encoder setVertexBuffer:self.uniforms offset:0 atIndex:MXVertexIndexUniforms];
 		[encoder setCullMode:MTLCullModeNone];
-
-		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
 		[self renderMesh:self.cylinders inEncoder:encoder];
 
 		// Hide phase
@@ -766,7 +765,9 @@
 		[encoder setDepthStencilState:self.layerClearStencil];
 		[encoder setStencilReferenceValue:0];	// Even: subtracted
 		[encoder setVertexBuffer:self.square offset:0 atIndex:MXVertexIndexVertices];
+		[encoder setFragmentBytes:&color length:sizeof(color) atIndex:MXFragmentIndexColor];
 		[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+
 		[encoder endEncoding];
 
 		/*
