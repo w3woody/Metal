@@ -24,16 +24,14 @@ using namespace metal;
  */
 
 struct VertexIn {
-    float3 position  [[attribute(MXAttributeIndexPosition)]];
-    float3 normal    [[attribute(MXAttributeIndexNormal)]];
-    float2 texture   [[attribute(MXAttributeIndexTexture)]];
+    float3 position	[[attribute(MXAttributeIndexPosition)]];
+    float3 normal	[[attribute(MXAttributeIndexNormal)]];
 };
 
 struct VertexOut
 {
-	float4 position [[position]];
+	float4 position	[[position]];
 	float3 normal;
-	float2 texture;
 };
 
 /*	ScreenVertexIn
@@ -43,7 +41,7 @@ struct VertexOut
 
 struct ScreenVertexIn
 {
-    float2 position  [[attribute(MXAttributeIndexPosition)]];
+    float2 position	[[attribute(MXAttributeIndexPosition)]];
 };
 
 struct ScreenVertexOut
@@ -84,7 +82,6 @@ vertex VertexOut vertex_main(VertexIn v [[stage_in]],
 	out.position = u.view * worldPosition;
 	float4 nvect = float4(v.normal,0) * u.inverse;
 	out.normal = normalize(nvect.xyz);
-	out.texture = v.texture;
 
 	return out;
 }

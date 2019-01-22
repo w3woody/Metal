@@ -30,8 +30,6 @@ typedef enum MXVertexIndex
 typedef enum MXFragmentIndex
 {
 	MXFragmentIndexColor = 0,			/* Location of color vector */
-	MXFragmentIndexUniform = 1,
-	MXFragmentIndexShader = 2,
 } MXFragmentIndex;
 
 /*
@@ -42,7 +40,6 @@ typedef enum MXAttributeIndex
 {
 	MXAttributeIndexPosition = 0,
 	MXAttributeIndexNormal = 1,
-	MXAttributeIndexTexture = 2,
 } MXAttributeIndex;
 
 /*
