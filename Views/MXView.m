@@ -388,10 +388,6 @@
 	self.clearDepthPipeline = [self.device newComputePipelineStateWithFunction:clearDepth error:nil];
 	self.countPipeline = [self.device newComputePipelineStateWithFunction:countFunction error:nil];
 
-//	### TODO: Finish writing code which clears according to the stencil above.
-//	### Add code to repeat for the other three objects in our scene.
-//	### Add code to repeat for the full four layers in our scene.
-
 	/*
 	 *	Use the vertex descriptor to load our models.
 	 */
