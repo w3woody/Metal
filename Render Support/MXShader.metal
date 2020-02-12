@@ -106,13 +106,13 @@ fragment float4 fragment_main(VertexOut v [[stage_in]])
 
 	// Diffuse lighting
 	float dotprod = dot(v.normal,normalLight);
-	float diffuseIntensity = clamp(dotprod,0,1);
+	float diffuseIntensity = clamp(dotprod,(float)0,(float)1);
 	float4 diffuse = float4(teapotColor * lightColor * diffuseIntensity,1.0);
 
 	// Specular lighting
 	float3 refl = (2 * dotprod) * v.normal - normalLight;
 	float specIntensity = dot(refl,normalEye);
-	specIntensity = clamp(specIntensity,0,1);
+	specIntensity = clamp(specIntensity,(float)0,(float)1);
 	specIntensity = powr(specIntensity,specularTightness);
 	float4 specular = float4(lightColor * specIntensity * specularIntensity,1.0);
 
